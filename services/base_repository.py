@@ -26,6 +26,10 @@ class BaseFirestoreRepository:
         doc = self.collection.document(doc_id.strip()).get()
         return doc.to_dict() if doc.exists else None
 
+    def get(self, doc_id: str) -> Optional[Dict[str, Any]]:
+        """Alias for get_by_id."""
+        return self.get_by_id(doc_id)
+
     def set(self, doc_id: str, data: Dict[str, Any], merge: bool = True) -> None:
         """Upsert a document by ID."""
         self.collection.document(doc_id.strip()).set(data, merge=merge)

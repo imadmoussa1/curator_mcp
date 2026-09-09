@@ -9,17 +9,20 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class BookModel(BaseModel):
-    """Schema for books in the Firestore 'books' collection."""
+    """Schema for books in the Firestore 'books' collection following Goodreads schema."""
     id: str = Field(..., description="Goodreads Book ID (string)")
     title: str = Field(..., description="Book title")
     author: str = Field(..., description="Book author name")
-    user_rating: int = Field(default=0, ge=0, le=5, description="User rating from 0 (unrated) to 5 stars")
+    user_rating: int = Field(default=0, ge=0, le=5, description="User rating from 0 (unrated) to 5 stars (Goodreads system)")
     avg_rating: float = Field(default=0.0, ge=0.0, le=5.0, description="Community average rating")
     shelf: str = Field(
         default="to-read",
         description="Reading status shelf: read, currently-reading, to-read"
     )
-    notes_and_reviews: str = Field(default="", description="User notes or review text")
+    notes_and_reviews: str = Field(default="", description="User notes or review text (legacy field)")
+    review: str = Field(default="", description="Goodreads written review text")
+    private_notes: str = Field(default="", description="Goodreads personal private notes")
+    date_started: Optional[str] = Field(default=None, description="Date started reading in YYYY-MM-DD format")
     date_read: Optional[str] = Field(default=None, description="Date read in YYYY-MM-DD format or timestamp string")
     updated_at: Optional[datetime] = Field(default=None, description="Last update timestamp")
 
@@ -38,13 +41,21 @@ class BookModel(BaseModel):
 
     def to_firestore_dict(self) -> dict:
         data = self.model_dump()
+        # Keep notes_and_reviews in sync for backward compatibility
+        if not data.get("notes_and_reviews") and (data.get("review") or data.get("private_notes")):
+            parts = []
+            if data.get("review"):
+                parts.append(f"Review: {data['review']}")
+            if data.get("private_notes"):
+                parts.append(f"Private Notes: {data['private_notes']}")
+            data["notes_and_reviews"] = " | ".join(parts)
         if not data.get("updated_at"):
             data["updated_at"] = datetime.now(timezone.utc)
         return data
 
 
 class MediaModel(BaseModel):
-    """Schema for movies & series in the Firestore 'media' collection."""
+    """Schema for movies & series in the Firestore 'media' collection following IMDb schema."""
     id: str = Field(..., description="IMDb Const ID (e.g. tt0111161)")
     title: str = Field(..., description="Title of the movie or series")
     media_type: str = Field(
@@ -55,7 +66,7 @@ class MediaModel(BaseModel):
         default=None,
         ge=1,
         le=10,
-        description="User rating from 1 to 10 (nullable if unrated watchlist item)"
+        description="User rating from 1 to 10 (IMDb rating system, nullable if unrated watchlist item)"
     )
     imdb_rating: Optional[float] = Field(default=None, ge=0.0, le=10.0, description="Community IMDb rating")
     year: Optional[int] = Field(default=None, description="Release year")
@@ -66,7 +77,10 @@ class MediaModel(BaseModel):
         default="watchlist",
         description="Status: watched or watchlist"
     )
-    notes: str = Field(default="", description="User notes or comments")
+    notes: str = Field(default="", description="User notes or comments (legacy field)")
+    review: str = Field(default="", description="IMDb written user review")
+    user_notes: str = Field(default="", description="Personal user notes")
+    date_watched: Optional[str] = Field(default=None, description="Date watched in YYYY-MM-DD format")
     updated_at: Optional[datetime] = Field(default=None, description="Last update timestamp")
 
     @field_validator("status")
@@ -79,6 +93,14 @@ class MediaModel(BaseModel):
 
     def to_firestore_dict(self) -> dict:
         data = self.model_dump()
+        # Keep notes in sync for backward compatibility
+        if not data.get("notes") and (data.get("review") or data.get("user_notes")):
+            parts = []
+            if data.get("review"):
+                parts.append(f"Review: {data['review']}")
+            if data.get("user_notes"):
+                parts.append(f"Notes: {data['user_notes']}")
+            data["notes"] = " | ".join(parts)
         if not data.get("updated_at"):
             data["updated_at"] = datetime.now(timezone.utc)
         return data

@@ -135,6 +135,65 @@ class TestNewCuratorFeatures(unittest.TestCase):
         self.assertEqual(wrapped["summary_metrics"]["total_podcasts_listened"], 1)
         self.assertEqual(wrapped["cultural_archetype"]["title"], "The Cybernetic Stoic")
 
+    @patch.object(BookService, "get")
+    @patch.object(BookService, "set")
+    def test_update_book_status_goodreads(self, mock_set, mock_get):
+        mock_get.return_value = {
+            "id": "12345",
+            "title": "Clean Code",
+            "author": "Robert C. Martin",
+            "shelf": "to-read",
+            "user_rating": 0,
+            "review": "",
+            "private_notes": ""
+        }
+        service = BookService()
+        result = service.update_status(
+            book_id="12345",
+            shelf="read",
+            user_rating=5,
+            review="Essential reading for software craftsmanship.",
+            private_notes="Reread chapter 3 on functions.",
+            date_read="2026-09-09"
+        )
+        self.assertEqual(result["status"], "success")
+        mock_set.assert_called_once()
+        updated = result["book"]
+        self.assertEqual(updated["shelf"], "read")
+        self.assertEqual(updated["user_rating"], 5)
+        self.assertEqual(updated["review"], "Essential reading for software craftsmanship.")
+        self.assertEqual(updated["private_notes"], "Reread chapter 3 on functions.")
+        self.assertEqual(updated["date_read"], "2026-09-09")
+
+    @patch.object(MediaService, "get")
+    @patch.object(MediaService, "set")
+    def test_update_media_status_imdb(self, mock_set, mock_get):
+        mock_get.return_value = {
+            "id": "tt1375666",
+            "title": "Inception",
+            "status": "watchlist",
+            "user_rating": None,
+            "review": "",
+            "user_notes": ""
+        }
+        service = MediaService()
+        result = service.update_status(
+            media_id="tt1375666",
+            status="watched",
+            user_rating=10,
+            review="A masterclass in original high-concept cinematic storytelling.",
+            user_notes="Watched in IMAX with friends.",
+            date_watched="2026-09-09"
+        )
+        self.assertEqual(result["status"], "success")
+        mock_set.assert_called_once()
+        updated = result["media"]
+        self.assertEqual(updated["status"], "watched")
+        self.assertEqual(updated["user_rating"], 10)
+        self.assertEqual(updated["review"], "A masterclass in original high-concept cinematic storytelling.")
+        self.assertEqual(updated["user_notes"], "Watched in IMAX with friends.")
+        self.assertEqual(updated["date_watched"], "2026-09-09")
+
 
 if __name__ == "__main__":
     unittest.main()

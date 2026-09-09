@@ -157,11 +157,14 @@ def log_read_book(
     author: str,
     user_rating: int,
     book_id: Optional[str] = None,
+    review: Optional[str] = "",
+    private_notes: Optional[str] = "",
     notes: Optional[str] = "",
     date_read: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Log a book the user has read, with user rating (0-5), review notes, and completion date.
+    Log a book the user has finished reading, following the Goodreads rating system (0 to 5 stars),
+    with optional written review, personal private notes, and date read (YYYY-MM-DD).
     """
     return book_service.log_read(
         title=title,
@@ -169,7 +172,44 @@ def log_read_book(
         user_rating=user_rating,
         book_id=book_id,
         notes=notes,
+        review=review,
+        private_notes=private_notes,
         date_read=date_read,
+    )
+
+
+@mcp.tool()
+def update_book_status(
+    title: Optional[str] = None,
+    book_id: Optional[str] = None,
+    shelf: str = "read",
+    user_rating: Optional[int] = None,
+    review: Optional[str] = None,
+    private_notes: Optional[str] = None,
+    date_read: Optional[str] = None,
+    date_started: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Update the reading status/shelf and add/edit reviews for a book using the Goodreads review system.
+    Args:
+        title: Title of the book (searched if book_id not provided)
+        book_id: Goodreads Book ID (exact document match)
+        shelf: Goodreads shelf: 'read', 'currently-reading', or 'to-read'
+        user_rating: Goodreads rating from 0 (unrated) to 5 stars
+        review: Written review text (equivalent to Goodreads 'My Review')
+        private_notes: Personal reflections or highlights (equivalent to Goodreads 'Private Notes')
+        date_read: Completion date in YYYY-MM-DD format
+        date_started: Date started reading in YYYY-MM-DD format
+    """
+    return book_service.update_status(
+        book_id=book_id,
+        title=title,
+        shelf=shelf,
+        user_rating=user_rating,
+        review=review,
+        private_notes=private_notes,
+        date_read=date_read,
+        date_started=date_started,
     )
 
 
@@ -278,10 +318,14 @@ def log_watched_media(
     year: Optional[int] = None,
     genres: Optional[List[str]] = None,
     directors: Optional[List[str]] = None,
-    notes: Optional[str] = ""
+    review: Optional[str] = "",
+    user_notes: Optional[str] = "",
+    notes: Optional[str] = "",
+    date_watched: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Log a movie or TV show the user watched with rating (1-10) and notes.
+    Log a movie or TV show the user watched, following the IMDb rating system (1 to 10),
+    with optional written review, personal notes, and date watched (YYYY-MM-DD).
     """
     return media_service.log_watched(
         title=title,
@@ -292,6 +336,41 @@ def log_watched_media(
         genres=genres,
         directors=directors,
         notes=notes,
+        review=review,
+        user_notes=user_notes,
+        date_watched=date_watched,
+    )
+
+
+@mcp.tool()
+def update_media_status(
+    title: Optional[str] = None,
+    media_id: Optional[str] = None,
+    status: str = "watched",
+    user_rating: Optional[int] = None,
+    review: Optional[str] = None,
+    user_notes: Optional[str] = None,
+    date_watched: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Update a movie or TV show's status ('watched' or 'watchlist') and add/edit reviews using the IMDb review system.
+    Args:
+        title: Title of the movie or series (searched if media_id not provided)
+        media_id: IMDb Const ID (e.g. tt0111161, exact document match)
+        status: Status: 'watched' or 'watchlist'
+        user_rating: IMDb user rating from 1 to 10
+        review: Written review text (e.g. thoughts on directing, cinematography, performances)
+        user_notes: Personal notes or viewing context
+        date_watched: Date watched in YYYY-MM-DD format
+    """
+    return media_service.update_status(
+        media_id=media_id,
+        title=title,
+        status=status,
+        user_rating=user_rating,
+        review=review,
+        user_notes=user_notes,
+        date_watched=date_watched,
     )
 
 

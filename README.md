@@ -194,7 +194,7 @@ python -m importers.imdb_importer --watchlist path/to/watchlist.csv
 
 ## 🛠️ Model Context Protocol (MCP) Tools
 
-The server registers **28 specialized tools** categorized across five domains:
+The server registers **30 specialized tools** categorized across five domains:
 
 ### 1. Taste Profile, Curate My Night & Annual Wrapped
 | Tool Name | Parameters | Description |
@@ -205,26 +205,28 @@ The server registers **28 specialized tools** categorized across five domains:
 | `curate_for_tonight` | `max_runtime_mins`, `genre`, `min_imdb_rating`, `media_type`, `count` | Smart evening picker that filters watchlist by runtime, mood, and ratings with match reasons. |
 | `generate_cultural_wrapped` | `year` | Comprehensive annual cultural retrospective with metrics and synthesized "Cultural Archetype". |
 
-### 2. Books Management & Discovery
+### 2. Books Management & Discovery (Goodreads Standard)
 | Tool Name | Parameters | Description |
 |---|---|---|
 | `search_books` | `query`, `shelf`, `limit` | Search Firestore library by title or author keywords. |
 | `get_recently_read_books` | `limit` | Retrieve finished books sorted chronologically by completion date. |
 | `get_reading_list` | `shelf`, `limit` | Retrieve books from `to-read` or `currently-reading` queues. |
 | `add_to_reading_list` | `title`, `author`, `notes` | Add a recommended book directly to the reading queue. |
-| `log_read_book` | `title`, `author`, `user_rating`, `notes`, `date_read` | Log a finished book with 0–5 rating and notes. |
+| `log_read_book` | `title`, `author`, `user_rating`, `review`, `private_notes`, `date_read` | Log a finished book with Goodreads rating (0–5★), written review, private notes, and date read. |
+| `update_book_status` | `title`, `book_id`, `shelf`, `user_rating`, `review`, `private_notes`, `date_read`, `date_started` | Update reading status/shelf (`read`, `currently-reading`, `to-read`), Goodreads rating, review, and notes. |
 | `get_book_details` | `book_id` | Fetch complete document for a book by Goodreads ID. |
 | `lookup_book_online` | `title`, `author` | Query Google Books & Open Library for synopses and covers. |
 | `find_similar_books_online` | `title`, `author`, `limit` | Discover books similar in theme and author style. |
 
-### 3. Media (Movies & TV) Management & Streaming
+### 3. Media (Movies & TV) Management & Streaming (IMDb Standard)
 | Tool Name | Parameters | Description |
 |---|---|---|
 | `search_media` | `query`, `media_type`, `status`, `limit` | Search movies and series by title or director. |
 | `get_recently_watched_media` | `limit`, `media_type` | Retrieve viewed movies/series sorted chronologically by rating date. |
 | `get_watchlist` | `media_type`, `genre`, `limit` | Retrieve watchlist items with optional genre filter. |
 | `add_to_watchlist` | `title`, `media_type`, `year`, `genres`, `directors`, `notes` | Add a movie or show to the watchlist. |
-| `log_watched_media` | `title`, `media_type`, `user_rating`, `notes` | Log a viewed film/series with 1–10 rating. |
+| `log_watched_media` | `title`, `media_type`, `user_rating`, `review`, `user_notes`, `date_watched` | Log a viewed film/series with IMDb rating (1–10), written review, personal notes, and date. |
+| `update_media_status` | `title`, `media_id`, `status`, `user_rating`, `review`, `user_notes`, `date_watched` | Update status (`watched` or `watchlist`), IMDb rating (1–10), written review, and viewing notes. |
 | `get_media_details` | `media_id` | Fetch complete record by IMDb Const ID (`tt...`). |
 | `get_streaming_providers` | `title`, `media_type`, `country` | Check where a title is streaming (Netflix, Max, Prime, Apple TV+) via TMDB / JustWatch. |
 | `lookup_media_online` | `title`, `media_type`, `year` | Query TMDB for synopsis, posters, and vote average. |
@@ -311,12 +313,18 @@ Once Curator MCP is connected to **Claude Desktop**, you can interact naturally 
   - 👉 **Tool called**: `get_recently_watched_media(limit=5)`
 - *"What was the last book I read and rated?"*
   - 👉 **Tool called**: `get_recently_read_books(limit=5)`
-- *"I just finished watching 'Dune: Part Two'. Log it as watched, rate it 9/10, and add notes: 'Spectacular sound design'."*
-  - 👉 **Tool called**: `log_watched_media(title='Dune: Part Two', user_rating=9, ...)`
-- *"I just finished 'Atomic Habits' by James Clear. Log it as read with a 5/5 star rating."*
-  - 👉 **Tool called**: `log_read_book(title='Atomic Habits', author='James Clear', user_rating=5)`
+- *"I just finished watching 'Dune: Part Two'. Log it as watched, rate it 9/10, review: 'Spectacular sound design and cinematography', user notes: 'Watched in IMAX'."*
+  - 👉 **Tool called**: `log_watched_media(title='Dune: Part Two', user_rating=9, review='Spectacular sound design and cinematography', user_notes='Watched in IMAX')`
+- *"I just finished 'Atomic Habits' by James Clear. Log it as read with a 5/5 star Goodreads rating and review: 'Actionable frameworks for habit loops'."*
+  - 👉 **Tool called**: `log_read_book(title='Atomic Habits', author='James Clear', user_rating=5, review='Actionable frameworks for habit loops')`
 
-### 6. 📋 Active Queues & Watchlists
+### 6. 📋 Active Queues, Status Updates & Reviews
+- *"I just finished reading 'Thinking, Fast and Slow'. Change its status to read, give it 5 stars on Goodreads, and review it: 'Mind-opening breakdown of cognitive biases'."*
+  - 👉 **Tool called**: `update_book_status(title='Thinking, Fast and Slow', shelf='read', user_rating=5, review='Mind-opening breakdown of cognitive biases')`
+- *"I am currently reading 'Deep Work' by Cal Newport. Move it to my currently-reading shelf."*
+  - 👉 **Tool called**: `update_book_status(title='Deep Work', shelf='currently-reading')`
+- *"I just watched 'Inception' from my watchlist. Change its status to watched, rate it 10/10 IMDb, and add review: 'Nolan's best original screenplay'."*
+  - 👉 **Tool called**: `update_media_status(title='Inception', status='watched', user_rating=10, review='Nolan's best original screenplay')`
 - *"What movies and series do I have on my watchlist?"*
   - 👉 **Tool called**: `get_watchlist(limit=10)`
 - *"What books do I have on my to-read shelf?"*
@@ -367,7 +375,7 @@ This project is built for **public open-source publication** and adheres to stri
 The codebase includes an automated unit test suite:
 
 ```bash
-# Run all 24 unit tests
+# Run all 26 unit tests
 .venv/bin/python -m unittest discover -s tests
 ```
 

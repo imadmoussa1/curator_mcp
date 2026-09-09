@@ -156,11 +156,23 @@ class MediaService(BaseFirestoreRepository):
         year: Optional[int] = None,
         genres: Optional[List[str]] = None,
         directors: Optional[List[str]] = None,
-        notes: Optional[str] = ""
+        notes: Optional[str] = "",
+        review: Optional[str] = "",
+        user_notes: Optional[str] = "",
+        date_watched: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Log a film or episode as watched with optional 1-10 rating."""
+        """Log a film or episode as watched with IMDb rating (1-10), written review, user notes, and date."""
         doc_id = media_id.strip() if media_id else self._generate_media_id(title)
         rating = max(1, min(10, user_rating)) if user_rating is not None else None
+
+        written_review = (review or "").strip()
+        u_notes = (user_notes or "").strip()
+        legacy_notes = (notes or "").strip()
+        if not written_review and legacy_notes:
+            written_review = legacy_notes
+
+        if not date_watched:
+            date_watched = datetime.now().strftime("%Y-%m-%d")
 
         media = MediaModel(
             id=doc_id,
@@ -171,14 +183,80 @@ class MediaService(BaseFirestoreRepository):
             year=year,
             genres=genres or [],
             directors=directors or [],
-            notes=notes or "",
+            notes=legacy_notes or written_review,
+            review=written_review,
+            user_notes=u_notes,
+            date_watched=date_watched,
             updated_at=datetime.now(timezone.utc)
         )
         self.set(doc_id, media.to_firestore_dict())
         return {
             "status": "success",
-            "message": f"Logged '{title}' ({media_type}) as watched" + (f" with rating {rating}/10." if rating else "."),
+            "message": f"Logged '{title}' ({media_type}) as watched" + (f" with IMDb rating {rating}/10." if rating else "."),
             "media": media.to_firestore_dict()
+        }
+
+    def update_status(
+        self,
+        media_id: Optional[str] = None,
+        title: Optional[str] = None,
+        status: str = "watched",
+        user_rating: Optional[int] = None,
+        review: Optional[str] = None,
+        user_notes: Optional[str] = None,
+        date_watched: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Update a movie or TV show's status (IMDb system: 'watched' or 'watchlist'),
+        with optional 1-10 IMDb user rating, written review, personal notes, and date.
+        Locates the media by media_id (IMDb Const ID) or title search.
+        """
+        target_doc = None
+        if media_id:
+            target_doc = self.get(media_id.strip())
+
+        if not target_doc and title:
+            matches = self.search(query=title, limit=1)
+            if matches:
+                target_doc = self.get(matches[0]["id"])
+
+        if not target_doc:
+            return {
+                "status": "error",
+                "message": f"Media not found by ID '{media_id}' or title '{title}'. Consider adding it first."
+            }
+
+        doc_id = target_doc["id"]
+        status_clean = status.strip().lower()
+        if "watch" in status_clean and "list" not in status_clean:
+            status_clean = "watched"
+        elif "list" in status_clean:
+            status_clean = "watchlist"
+
+        target_doc["status"] = status_clean
+        target_doc["updated_at"] = datetime.now(timezone.utc)
+
+        if user_rating is not None:
+            target_doc["user_rating"] = max(1, min(10, int(user_rating)))
+
+        if review is not None:
+            target_doc["review"] = review.strip()
+            # Keep legacy notes in sync
+            target_doc["notes"] = review.strip()
+
+        if user_notes is not None:
+            target_doc["user_notes"] = user_notes.strip()
+
+        if date_watched is not None:
+            target_doc["date_watched"] = date_watched.strip()
+        elif status_clean == "watched" and not target_doc.get("date_watched"):
+            target_doc["date_watched"] = datetime.now().strftime("%Y-%m-%d")
+
+        self.set(doc_id, target_doc)
+        return {
+            "status": "success",
+            "message": f"Updated media '{target_doc.get('title')}' status to '{status_clean}'.",
+            "media": target_doc
         }
 
     def get_stats(self) -> Dict[str, Any]:
