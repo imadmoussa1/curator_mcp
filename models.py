@@ -1,6 +1,6 @@
 """
 Data schemas and models for life_os_mcp using Pydantic.
-Validates books and media entries before writing to Firestore.
+Validates books, media, quotes, and podcasts entries before writing to Firestore.
 """
 
 from datetime import datetime, timezone
@@ -75,6 +75,61 @@ class MediaModel(BaseModel):
         if v_clean in ("watched", "watchlist"):
             return v_clean
         return "watched" if "watch" in v_clean and "list" not in v_clean else "watchlist"
+
+    def to_firestore_dict(self) -> dict:
+        data = self.model_dump()
+        if not data.get("updated_at"):
+            data["updated_at"] = datetime.now(timezone.utc)
+        return data
+
+
+class QuoteModel(BaseModel):
+    """Schema for memorable quotes from books, movies, or shows in 'quotes' collection."""
+    id: str = Field(..., description="Unique Quote ID (e.g. quote_...)")
+    quote_text: str = Field(..., description="The quote or excerpt text")
+    source_type: str = Field(default="book", description="Type of source: 'book' or 'media'")
+    source_title: str = Field(..., description="Title of the book, movie, or series")
+    source_id: Optional[str] = Field(default=None, description="Optional Goodreads Book ID or IMDb Const ID")
+    speaker_or_author: str = Field(default="", description="Author name (books) or character name (movies/shows)")
+    theme_tags: List[str] = Field(default_factory=list, description="Tags like discipline, uncertainty, habit, courage")
+    notes: str = Field(default="", description="Personal reflections, context, or takeaways")
+    favorite: bool = Field(default=False, description="Flag for user's all-time favorite quotes")
+    updated_at: Optional[datetime] = Field(default=None, description="Timestamp of creation/update")
+
+    @field_validator("source_type")
+    @classmethod
+    def validate_source_type(cls, v: str) -> str:
+        v_clean = v.strip().lower()
+        return "media" if any(k in v_clean for k in ("movie", "tv", "film", "series", "media")) else "book"
+
+    def to_firestore_dict(self) -> dict:
+        data = self.model_dump()
+        if not data.get("updated_at"):
+            data["updated_at"] = datetime.now(timezone.utc)
+        return data
+
+
+class PodcastModel(BaseModel):
+    """Schema for podcast episodes in the 'podcasts' collection."""
+    id: str = Field(..., description="Unique Podcast Episode ID (e.g. pod_...)")
+    podcast_name: str = Field(..., description="Name of the podcast show (e.g. Huberman Lab, Lex Fridman)")
+    episode_title: str = Field(..., description="Title of the specific episode")
+    host: str = Field(default="", description="Podcast host name")
+    guest: Optional[str] = Field(default=None, description="Interview guest name if applicable")
+    status: str = Field(default="queue", description="Status: 'queue' or 'listened'")
+    user_rating: Optional[int] = Field(default=None, ge=1, le=10, description="User rating from 1 to 10")
+    topics: List[str] = Field(default_factory=list, description="Topics/concepts covered (e.g. neuroscience, AI)")
+    key_takeaways: str = Field(default="", description="Personal notes or main lessons learned")
+    episode_url: Optional[str] = Field(default=None, description="Link to episode on Spotify, Apple, or YouTube")
+    duration_mins: Optional[int] = Field(default=None, description="Approximate duration in minutes")
+    date_listened: Optional[str] = Field(default=None, description="Date listened in YYYY-MM-DD format")
+    updated_at: Optional[datetime] = Field(default=None, description="Timestamp of creation/update")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        v_clean = v.strip().lower()
+        return "listened" if "listen" in v_clean or "done" in v_clean or "heard" in v_clean else "queue"
 
     def to_firestore_dict(self) -> dict:
         data = self.model_dump()

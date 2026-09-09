@@ -1,32 +1,54 @@
 """
 FastMCP Server for life_os_mcp (Personal Entertainment OS).
-Exposes tools for Gemini to query reading/watching history, manage watchlists and reading lists,
-log newly watched/read content, and analyze taste profiles to provide hyper-personalized recommendations.
+
+Senior Architecture Presentation Layer:
+Exposes tools for Gemini / Claude to manage:
+1. Books (Read, Currently-Reading, To-Read) & Online Discovery (Google Books / Open Library)
+2. Media (Watched, Watchlist) & Online Discovery (TMDB)
+3. Memorable Quotes & Mental Models (Books & Movie/TV quotes, reflections)
+4. Podcasts (Queue, Listened, Guest tracking, Key Takeaways, Online Search)
+5. Taste Profile Aggregation & Smart AI Recommendations
+
+All core domain logic is decoupled into services/ and repositories/.
 """
 
-import re
-import uuid
-from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from collections import Counter
-
 from fastmcp import FastMCP
-from config import get_db
-from models import BookModel, MediaModel
+
+from services import (
+    BookService,
+    MediaService,
+    QuoteService,
+    PodcastService,
+    RecommendationService,
+    BookMetadataClient,
+    TMDBClient,
+    ApplePodcastsClient,
+)
 
 # Initialize FastMCP Server
 mcp = FastMCP("Personal-Entertainment-OS")
 
+# Dependency Injection & Service Initialization
+book_service = BookService()
+media_service = MediaService()
+quote_service = QuoteService()
+podcast_service = PodcastService()
 
-def _generate_id(prefix: str, text: str) -> str:
-    """Generates a clean identifier if none is provided."""
-    slug = re.sub(r"[^a-zA-Z0-9]+", "_", text.strip().lower()).strip("_")
-    short_uuid = uuid.uuid4().hex[:6]
-    return f"{prefix}_{slug[:20]}_{short_uuid}"
+books_client = BookMetadataClient()
+tmdb_client = TMDBClient()
+podcast_client = ApplePodcastsClient()
+
+recommendation_service = RecommendationService(
+    book_service=book_service,
+    media_service=media_service,
+    books_client=books_client,
+    tmdb_client=tmdb_client,
+)
 
 
 # ============================================================================
-# 1. TASTE PROFILE & STATS (Designed for Gemini Recommendation Engines)
+# 1. TASTE PROFILE & HIGH-LEVEL METRICS
 # ============================================================================
 
 @mcp.tool()
@@ -38,209 +60,148 @@ def get_user_taste_profile() -> Dict[str, Any]:
         Favorite genres, top directors, top authors, highest rated books (4-5 stars),
         and highest rated movies/series (8-10 stars).
     """
-    db = get_db()
-
-    # Query highly rated books (user_rating >= 4)
-    books_ref = db.collection("books")
-    rated_books_query = books_ref.where("user_rating", ">=", 4).stream()
-
-    top_books = []
-    author_counts = Counter()
-    for doc in rated_books_query:
-        b = doc.to_dict()
-        top_books.append({
-            "title": b.get("title"),
-            "author": b.get("author"),
-            "user_rating": b.get("user_rating"),
-            "notes": b.get("notes_and_reviews") or ""
-        })
-        if b.get("author"):
-            author_counts[b["author"]] += 1
-
-    # Query highly rated media (user_rating >= 8)
-    media_ref = db.collection("media")
-    rated_media_query = media_ref.where("user_rating", ">=", 8).stream()
-
-    top_media = []
-    genre_counts = Counter()
-    director_counts = Counter()
-    for doc in rated_media_query:
-        m = doc.to_dict()
-        top_media.append({
-            "title": m.get("title"),
-            "media_type": m.get("media_type"),
-            "user_rating": m.get("user_rating"),
-            "imdb_rating": m.get("imdb_rating"),
-            "genres": m.get("genres", []),
-            "directors": m.get("directors", [])
-        })
-        for g in m.get("genres", []):
-            genre_counts[g] += 1
-        for d in m.get("directors", []):
-            director_counts[d] += 1
-
-    return {
-        "status": "success",
-        "taste_summary": {
-            "top_genres": [g for g, _ in genre_counts.most_common(5)],
-            "top_directors": [d for d, _ in director_counts.most_common(5)],
-            "top_authors": [a for a, _ in author_counts.most_common(5)],
-        },
-        "favorite_books_sample": top_books[:10],
-        "favorite_media_sample": top_media[:10],
-        "total_highly_rated_books": len(top_books),
-        "total_highly_rated_media": len(top_media),
-    }
+    return recommendation_service.get_taste_profile()
 
 
 @mcp.tool()
 def get_entertainment_stats() -> Dict[str, Any]:
     """
-    Get high-level summary metrics across the user's entertainment database.
-    Shows total read books, currently reading, to-read queue, watched media vs watchlist.
+    Get macro metrics across all collections: Books, Movies/Series, Quotes, and Podcasts.
+    Returns counts, shelf breakdowns, and average ratings.
     """
-    db = get_db()
-
-    # Books breakdown
-    books_ref = db.collection("books").stream()
-    book_shelves = Counter()
-    book_ratings = []
-    total_books = 0
-
-    for doc in books_ref:
-        total_books += 1
-        b = doc.to_dict()
-        shelf = b.get("shelf", "unknown")
-        book_shelves[shelf] += 1
-        r = b.get("user_rating")
-        if r and r > 0:
-            book_ratings.append(r)
-
-    # Media breakdown
-    media_ref = db.collection("media").stream()
-    media_status = Counter()
-    media_types = Counter()
-    media_ratings = []
-    total_media = 0
-
-    for doc in media_ref:
-        total_media += 1
-        m = doc.to_dict()
-        status = m.get("status", "unknown")
-        media_status[status] += 1
-        m_type = m.get("media_type", "movie")
-        media_types[m_type] += 1
-        r = m.get("user_rating")
-        if r and r > 0:
-            media_ratings.append(r)
-
-    avg_book_rating = round(sum(book_ratings) / len(book_ratings), 2) if book_ratings else None
-    avg_media_rating = round(sum(media_ratings) / len(media_ratings), 2) if media_ratings else None
-
     return {
-        "books": {
-            "total": total_books,
-            "read": book_shelves.get("read", 0),
-            "currently_reading": book_shelves.get("currently-reading", 0),
-            "to_read": book_shelves.get("to-read", 0),
-            "avg_user_rating": avg_book_rating,
-        },
-        "media": {
-            "total": total_media,
-            "watched": media_status.get("watched", 0),
-            "watchlist": media_status.get("watchlist", 0),
-            "types": dict(media_types),
-            "avg_user_rating": avg_media_rating,
-        }
+        "books": book_service.get_stats(),
+        "media": media_service.get_stats(),
+        "quotes": {"total": len(quote_service.stream_all())},
+        "podcasts": podcast_service.get_stats(),
     }
 
 
+@mcp.tool()
+def get_smart_recommendations(category: str = "all", limit: int = 5) -> Dict[str, Any]:
+    """
+    Generate fresh, intelligent recommendations by taking the user's top-rated items from Firestore,
+    querying external APIs for similar items, and automatically filtering out any books or media
+    the user has already read, watched, or already has on their queues.
+    Args:
+        category: 'books', 'movies', 'tv', or 'all'
+        limit: Max recommendations per category
+    """
+    return recommendation_service.get_smart_recommendations(category=category, limit=limit)
+
+
 # ============================================================================
-# 2. READING LIST & WATCHLIST (What I want to read or watch)
+# 2. BOOKS MANAGEMENT & DISCOVERY
 # ============================================================================
+
+@mcp.tool()
+def search_books(query: str, shelf: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Search books in Firestore library by title or author keywords with optional shelf filter
+    ('read', 'currently-reading', 'to-read').
+    """
+    return book_service.search(query=query, shelf=shelf, limit=limit)
+
 
 @mcp.tool()
 def get_reading_list(shelf: str = "to-read", limit: int = 20) -> List[Dict[str, Any]]:
     """
-    Retrieve books from the user's reading queue (default 'to-read', or 'currently-reading').
-    Args:
-        shelf: 'to-read' or 'currently-reading'
-        limit: Maximum number of books to return (default: 20)
+    Retrieve books from user's reading queue (default 'to-read', or 'currently-reading').
     """
-    db = get_db()
-    docs = db.collection("books").where("shelf", "==", shelf.strip().lower()).limit(limit).stream()
-    results = []
-    for doc in docs:
-        b = doc.to_dict()
-        results.append({
-            "id": doc.id,
-            "title": b.get("title"),
-            "author": b.get("author"),
-            "avg_rating": b.get("avg_rating"),
-            "shelf": b.get("shelf"),
-            "notes": b.get("notes_and_reviews")
-        })
-    return results
+    return book_service.get_reading_list(shelf=shelf, limit=limit)
 
 
 @mcp.tool()
-def get_watchlist(media_type: Optional[str] = None, genre: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
-    """
-    Retrieve movies or TV series currently on the user's watchlist (items they want to watch).
-    Args:
-        media_type: Optional filter by type (e.g. 'movie', 'tvSeries', 'tvMiniSeries')
-        genre: Optional filter by genre (e.g. 'Sci-Fi', 'Drama', 'Comedy')
-        limit: Maximum items to return (default: 20)
-    """
-    db = get_db()
-    query = db.collection("media").where("status", "==", "watchlist")
-    if media_type:
-        query = query.where("media_type", "==", media_type)
-
-    docs = query.limit(limit * 2 if genre else limit).stream()
-    results = []
-    for doc in docs:
-        m = doc.to_dict()
-        genres = m.get("genres", [])
-        if genre and not any(g.lower() == genre.lower() for g in genres):
-            continue
-        results.append({
-            "id": doc.id,
-            "title": m.get("title"),
-            "media_type": m.get("media_type"),
-            "year": m.get("year"),
-            "imdb_rating": m.get("imdb_rating"),
-            "genres": genres,
-            "directors": m.get("directors", []),
-            "notes": m.get("notes")
-        })
-        if len(results) >= limit:
-            break
-    return results
-
-
-@mcp.tool()
-def add_to_reading_list(title: str, author: str, book_id: Optional[str] = None, notes: Optional[str] = "") -> Dict[str, Any]:
+def add_to_reading_list(
+    title: str,
+    author: str,
+    book_id: Optional[str] = None,
+    notes: Optional[str] = ""
+) -> Dict[str, Any]:
     """
     Add a new book recommendation to the user's 'to-read' shelf.
-    Gemini should use this when the user says: 'Add [Book] to my reading list' or agrees to a recommendation.
     """
-    db = get_db()
-    doc_id = book_id.strip() if book_id else _generate_id("gr", f"{title}_{author}")
-    book = BookModel(
-        id=doc_id,
-        title=title.strip(),
-        author=author.strip(),
-        shelf="to-read",
-        notes_and_reviews=notes or "",
-        updated_at=datetime.now(timezone.utc)
+    return book_service.add_to_reading_list(title=title, author=author, book_id=book_id, notes=notes)
+
+
+@mcp.tool()
+def log_read_book(
+    title: str,
+    author: str,
+    user_rating: int,
+    book_id: Optional[str] = None,
+    notes: Optional[str] = "",
+    date_read: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Log a book the user has read, with user rating (0-5), review notes, and completion date.
+    """
+    return book_service.log_read(
+        title=title,
+        author=author,
+        user_rating=user_rating,
+        book_id=book_id,
+        notes=notes,
+        date_read=date_read,
     )
-    db.collection("books").document(doc_id).set(book.to_firestore_dict(), merge=True)
-    return {
-        "status": "success",
-        "message": f"Added '{title}' by {author} to reading list.",
-        "book": book.to_firestore_dict()
-    }
+
+
+@mcp.tool()
+def get_book_details(book_id: str) -> Dict[str, Any]:
+    """
+    Retrieve full details of a specific book by its Goodreads ID.
+    """
+    doc = book_service.get(book_id.strip())
+    if not doc:
+        return {"status": "error", "message": f"Book with ID '{book_id}' not found."}
+    return {"status": "success", "book": doc}
+
+
+@mcp.tool()
+def lookup_book_online(title: str, author: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Search Google Books API (with Open Library automatic fallback) for rich metadata
+    (full synopsis, publisher, categories, page count, cover image, and average rating).
+    """
+    return books_client.search(query=title, author=author, limit=5)
+
+
+@mcp.tool()
+def find_similar_books_online(title: str, author: Optional[str] = None, limit: int = 5) -> Dict[str, Any]:
+    """
+    Find books similar to a given title by querying Google Books / Open Library for the seed
+    book's themes, categories, and author relationships.
+    """
+    return books_client.find_similar(title=title, author=author, limit=limit)
+
+
+# ============================================================================
+# 3. MEDIA (MOVIES & TV SERIES) MANAGEMENT & DISCOVERY
+# ============================================================================
+
+@mcp.tool()
+def search_media(
+    query: str,
+    media_type: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Search movies and TV shows in Firestore library by title or director keywords.
+    """
+    return media_service.search(query=query, media_type=media_type, status=status, limit=limit)
+
+
+@mcp.tool()
+def get_watchlist(
+    media_type: Optional[str] = None,
+    genre: Optional[str] = None,
+    limit: int = 20
+) -> List[Dict[str, Any]]:
+    """
+    Retrieve movies or TV series currently on user's watchlist with optional genre or media_type filter.
+    """
+    return media_service.get_watchlist(media_type=media_type, genre=genre, limit=limit)
 
 
 @mcp.tool()
@@ -255,69 +216,18 @@ def add_to_watchlist(
     notes: Optional[str] = ""
 ) -> Dict[str, Any]:
     """
-    Add a movie or series to the user's watchlist (what they want to watch).
-    Gemini should call this when the user wants to bookmark a recommended movie or TV show.
+    Add a movie or series to user's watchlist.
     """
-    db = get_db()
-    doc_id = media_id.strip() if media_id else _generate_id("tt", title)
-    media = MediaModel(
-        id=doc_id,
-        title=title.strip(),
-        media_type=media_type.strip(),
-        status="watchlist",
+    return media_service.add_to_watchlist(
+        title=title,
+        media_type=media_type,
+        media_id=media_id,
         year=year,
-        genres=genres or [],
-        directors=directors or [],
+        genres=genres,
+        directors=directors,
         imdb_rating=imdb_rating,
-        notes=notes or "",
-        updated_at=datetime.now(timezone.utc)
+        notes=notes,
     )
-    db.collection("media").document(doc_id).set(media.to_firestore_dict(), merge=True)
-    return {
-        "status": "success",
-        "message": f"Added '{title}' to watchlist.",
-        "media": media.to_firestore_dict()
-    }
-
-
-# ============================================================================
-# 3. LOGGING CONSUMED ITEMS (What I watched or read)
-# ============================================================================
-
-@mcp.tool()
-def log_read_book(
-    title: str,
-    author: str,
-    user_rating: int,
-    book_id: Optional[str] = None,
-    notes: Optional[str] = "",
-    date_read: Optional[str] = None
-) -> Dict[str, Any]:
-    """
-    Log a book that the user has read, recording user rating (0-5) and notes.
-    Gemini should call this when the user says: 'I just finished reading [Book] and give it 5 stars'.
-    """
-    db = get_db()
-    doc_id = book_id.strip() if book_id else _generate_id("gr", f"{title}_{author}")
-    if not date_read:
-        date_read = datetime.now().strftime("%Y-%m-%d")
-
-    book = BookModel(
-        id=doc_id,
-        title=title.strip(),
-        author=author.strip(),
-        user_rating=max(0, min(5, user_rating)),
-        shelf="read",
-        notes_and_reviews=notes or "",
-        date_read=date_read,
-        updated_at=datetime.now(timezone.utc)
-    )
-    db.collection("books").document(doc_id).set(book.to_firestore_dict(), merge=True)
-    return {
-        "status": "success",
-        "message": f"Logged '{title}' by {author} as read with rating {user_rating}/5.",
-        "book": book.to_firestore_dict()
-    }
 
 
 @mcp.tool()
@@ -332,138 +242,192 @@ def log_watched_media(
     notes: Optional[str] = ""
 ) -> Dict[str, Any]:
     """
-    Log a movie or TV show episode/season that the user watched.
-    Gemini should call this when the user says: 'I watched Inception last night, give it a 9/10'.
+    Log a movie or TV show the user watched with rating (1-10) and notes.
     """
-    db = get_db()
-    doc_id = media_id.strip() if media_id else _generate_id("tt", title)
-    rating = max(1, min(10, user_rating)) if user_rating is not None else None
-
-    media = MediaModel(
-        id=doc_id,
-        title=title.strip(),
-        media_type=media_type.strip(),
-        user_rating=rating,
-        status="watched",
+    return media_service.log_watched(
+        title=title,
+        media_type=media_type,
+        user_rating=user_rating,
+        media_id=media_id,
         year=year,
-        genres=genres or [],
-        directors=directors or [],
-        notes=notes or "",
-        updated_at=datetime.now(timezone.utc)
+        genres=genres,
+        directors=directors,
+        notes=notes,
     )
-    db.collection("media").document(doc_id).set(media.to_firestore_dict(), merge=True)
-    return {
-        "status": "success",
-        "message": f"Logged '{title}' ({media_type}) as watched" + (f" with rating {rating}/10." if rating else "."),
-        "media": media.to_firestore_dict()
-    }
-
-
-# ============================================================================
-# 4. SEARCH & DETAILS
-# ============================================================================
-
-@mcp.tool()
-def search_books(query: str, shelf: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
-    """
-    Search books in Firestore by title or author keywords.
-    Args:
-        query: Search term (e.g. 'Dune', 'Brandon Sanderson')
-        shelf: Optional shelf filter ('read', 'currently-reading', 'to-read')
-        limit: Max results (default: 10)
-    """
-    db = get_db()
-    col_ref = db.collection("books")
-    if shelf:
-        col_ref = col_ref.where("shelf", "==", shelf.strip().lower())
-
-    # Stream and match locally for keyword flexibility
-    q_norm = query.strip().lower()
-    matches = []
-    for doc in col_ref.stream():
-        b = doc.to_dict()
-        title = (b.get("title") or "").lower()
-        author = (b.get("author") or "").lower()
-        if q_norm in title or q_norm in author:
-            matches.append({
-                "id": doc.id,
-                "title": b.get("title"),
-                "author": b.get("author"),
-                "user_rating": b.get("user_rating"),
-                "avg_rating": b.get("avg_rating"),
-                "shelf": b.get("shelf"),
-                "notes": b.get("notes_and_reviews")
-            })
-            if len(matches) >= limit:
-                break
-    return matches
-
-
-@mcp.tool()
-def search_media(
-    query: str,
-    media_type: Optional[str] = None,
-    status: Optional[str] = None,
-    limit: int = 10
-) -> List[Dict[str, Any]]:
-    """
-    Search movies and TV shows in Firestore by title or director.
-    Args:
-        query: Search term (e.g. 'Nolan', 'Interstellar')
-        media_type: Optional filter ('movie', 'tvSeries', etc.)
-        status: Optional filter ('watched', 'watchlist')
-        limit: Max results (default: 10)
-    """
-    db = get_db()
-    col_ref = db.collection("media")
-    if media_type:
-        col_ref = col_ref.where("media_type", "==", media_type)
-    if status:
-        col_ref = col_ref.where("status", "==", status)
-
-    q_norm = query.strip().lower()
-    matches = []
-    for doc in col_ref.stream():
-        m = doc.to_dict()
-        title = (m.get("title") or "").lower()
-        directors = [d.lower() for d in m.get("directors", [])]
-        if q_norm in title or any(q_norm in d for d in directors):
-            matches.append({
-                "id": doc.id,
-                "title": m.get("title"),
-                "media_type": m.get("media_type"),
-                "year": m.get("year"),
-                "user_rating": m.get("user_rating"),
-                "imdb_rating": m.get("imdb_rating"),
-                "status": m.get("status"),
-                "genres": m.get("genres", []),
-                "directors": m.get("directors", [])
-            })
-            if len(matches) >= limit:
-                break
-    return matches
-
-
-@mcp.tool()
-def get_book_details(book_id: str) -> Dict[str, Any]:
-    """Retrieve full details of a specific book by its Goodreads ID."""
-    db = get_db()
-    doc = db.collection("books").document(book_id.strip()).get()
-    if not doc.exists:
-        return {"status": "error", "message": f"Book with ID '{book_id}' not found."}
-    return {"status": "success", "book": doc.to_dict()}
 
 
 @mcp.tool()
 def get_media_details(media_id: str) -> Dict[str, Any]:
-    """Retrieve full details of a specific movie or show by its IMDb Const ID."""
-    db = get_db()
-    doc = db.collection("media").document(media_id.strip()).get()
-    if not doc.exists:
+    """
+    Retrieve full details of a specific movie or show by its IMDb Const ID.
+    """
+    doc = media_service.get(media_id.strip())
+    if not doc:
         return {"status": "error", "message": f"Media with ID '{media_id}' not found."}
-    return {"status": "success", "media": doc.to_dict()}
+    return {"status": "success", "media": doc}
 
+
+@mcp.tool()
+def lookup_media_online(title: str, media_type: str = "movie", year: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Search TMDB (The Movie Database) for a movie or TV show to get synopsis overview,
+    poster URL, vote average, release date, and genres.
+    Requires TMDB_API_KEY in .env.
+    """
+    return tmdb_client.search(title=title, media_type=media_type, year=year)
+
+
+@mcp.tool()
+def find_similar_media_online(title: str, media_type: str = "movie", limit: int = 5) -> Dict[str, Any]:
+    """
+    Use TMDB's recommendation algorithm to find movies or TV series similar to a title.
+    Requires TMDB_API_KEY in .env.
+    """
+    return tmdb_client.find_similar(title=title, media_type=media_type, limit=limit)
+
+
+# ============================================================================
+# 4. MEMORABLE QUOTES & MENTAL MODELS
+# ============================================================================
+
+@mcp.tool()
+def add_quote(
+    quote_text: str,
+    source_title: str,
+    source_type: str = "book",
+    speaker_or_author: Optional[str] = "",
+    theme_tags: Optional[List[str]] = None,
+    notes: Optional[str] = "",
+    favorite: bool = False
+) -> Dict[str, Any]:
+    """
+    Save a memorable quote or mental model from a book, movie, or TV show.
+    """
+    return quote_service.add(
+        quote_text=quote_text,
+        source_title=source_title,
+        source_type=source_type,
+        speaker_or_author=speaker_or_author,
+        theme_tags=theme_tags,
+        notes=notes,
+        favorite=favorite,
+    )
+
+
+@mcp.tool()
+def get_random_quote(theme: Optional[str] = None, source_type: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Retrieve a random memorable quote for reflection, inspiration, or decision-making.
+    Optionally filter by theme (e.g. 'discipline', 'stoicism') or source type ('book', 'media').
+    """
+    return quote_service.get_random(theme=theme, source_type=source_type)
+
+
+@mcp.tool()
+def search_quotes(
+    query: str,
+    theme: Optional[str] = None,
+    source_title: Optional[str] = None,
+    limit: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Search your saved quotes by keyword in the quote text, author/speaker, theme tags, or source title.
+    """
+    return quote_service.search(query=query, theme=theme, source_title=source_title, limit=limit)
+
+
+@mcp.tool()
+def list_favorite_quotes(limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Retrieve all quotes marked as favorite.
+    """
+    return quote_service.list_favorites(limit=limit)
+
+
+# ============================================================================
+# 5. PODCAST TRACKING & EPISODES
+# ============================================================================
+
+@mcp.tool()
+def add_to_podcast_queue(
+    podcast_name: str,
+    episode_title: str,
+    guest: Optional[str] = None,
+    topics: Optional[List[str]] = None,
+    episode_url: Optional[str] = None,
+    duration_mins: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Add an episode to your podcast queue to listen to later.
+    """
+    return podcast_service.add_to_queue(
+        podcast_name=podcast_name,
+        episode_title=episode_title,
+        guest=guest,
+        topics=topics,
+        episode_url=episode_url,
+        duration_mins=duration_mins,
+    )
+
+
+@mcp.tool()
+def log_listened_podcast(
+    podcast_name: str,
+    episode_title: str,
+    user_rating: Optional[int] = None,
+    guest: Optional[str] = None,
+    key_takeaways: Optional[str] = "",
+    topics: Optional[List[str]] = None,
+    date_listened: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Log a podcast episode you listened to, recording key takeaways, guest, topics, and rating (1-10).
+    """
+    return podcast_service.log_listened(
+        podcast_name=podcast_name,
+        episode_title=episode_title,
+        user_rating=user_rating,
+        guest=guest,
+        key_takeaways=key_takeaways,
+        topics=topics,
+        date_listened=date_listened,
+    )
+
+
+@mcp.tool()
+def get_podcast_queue(limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Retrieve episodes currently in your podcast listening queue.
+    """
+    return podcast_service.get_queue(limit=limit)
+
+
+@mcp.tool()
+def search_podcasts(
+    query: str,
+    guest: Optional[str] = None,
+    topic: Optional[str] = None,
+    limit: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Search your podcast database by show name, episode title, guest name, or topic.
+    """
+    return podcast_service.search(query=query, guest=guest, topic=topic, limit=limit)
+
+
+@mcp.tool()
+def lookup_podcast_online(query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    """
+    Search for podcast shows online via Apple Podcasts API.
+    Returns show name, artist/host, genres, episode count, artwork URL, and feed URL.
+    Works free with zero API key required.
+    """
+    return podcast_client.search(show_name=query, limit=limit)
+
+
+# ============================================================================
+# SERVER RUNNER
+# ============================================================================
 
 if __name__ == "__main__":
-    # Runs standard FastMCP server over stdio
     mcp.run()

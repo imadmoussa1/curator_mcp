@@ -14,6 +14,8 @@ load_dotenv(BASE_DIR / ".env")
 
 FIREBASE_CREDENTIALS_PATH = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
 PORT = int(os.getenv("PORT", "8000"))
+TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
+GOOGLE_BOOKS_API_KEY = os.getenv("GOOGLE_BOOKS_API_KEY", "")
 
 _db = None
 

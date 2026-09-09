@@ -2,6 +2,8 @@
 IMDb CSV Importer for life_os_mcp.
 Ingests IMDb ratings.csv and watchlist.csv exports into the Firestore 'media' collection.
 
+OOP Senior Architecture: Subclasses BaseImporter with typed parsing and validation.
+
 Usage:
     python -m importers.imdb_importer --ratings path/to/ratings.csv --watchlist path/to/watchlist.csv
     python -m importers.imdb_importer --ratings path/to/ratings.csv
@@ -15,11 +17,8 @@ from typing import Optional, List, Dict, Any
 import pandas as pd
 from datetime import datetime, timezone
 
-from config import db, get_db
 from models import MediaModel
-
-
-BATCH_SIZE = 500
+from importers.base import BaseImporter
 
 
 def clean_list_field(val: Any) -> List[str]:
@@ -32,90 +31,154 @@ def clean_list_field(val: Any) -> List[str]:
     return [item.strip() for item in s.split(",") if item.strip()]
 
 
+class IMDbImporter(BaseImporter):
+    """
+    Data ingestion pipeline for IMDb ratings and watchlist CSV exports.
+    Normalizes schemas, deduplicates IDs across ratings & watchlist, and batches writes to Firestore.
+    """
+
+    def __init__(self, dry_run: bool = False):
+        super().__init__(collection_name="media", dry_run=dry_run)
+
+    def parse_dataframe(self, df: pd.DataFrame, default_status: str = "watched") -> List[MediaModel]:
+        """
+        Parses IMDb export dataframe into MediaModel instances.
+        Extracts Const (ID), Your Rating, Date Rated, Title, Title Type, IMDb Rating, Year, Genres, Directors.
+        """
+        col_map = {}
+        for col in df.columns:
+            norm = col.strip().lower().replace(" ", "_").replace("-", "_")
+            col_map[norm] = col
+
+        def get_val(row, *candidates, default=None):
+            for c in candidates:
+                c_norm = c.lower().replace(" ", "_").replace("-", "_")
+                if c_norm in col_map:
+                    val = row[col_map[c_norm]]
+                    if not pd.isna(val) and val is not None and str(val).strip() != "":
+                        return val
+            return default
+
+        media_items: List[MediaModel] = []
+
+        for _, row in df.iterrows():
+            const_id = get_val(row, "Const", "const", "imdb_id", "id")
+            if not const_id:
+                continue
+            const_id = str(const_id).strip()
+
+            title = str(get_val(row, "Title", "title", default="Untitled")).strip()
+            media_type = str(get_val(row, "Title Type", "title_type", "type", default="movie")).strip()
+
+            # User rating
+            raw_user_rating = get_val(row, "Your Rating", "your_rating", "user_rating", "rating")
+            user_rating = None
+            if raw_user_rating is not None:
+                try:
+                    user_rating = int(float(raw_user_rating))
+                    user_rating = max(1, min(10, user_rating))
+                except (ValueError, TypeError):
+                    user_rating = None
+
+            # IMDb rating
+            raw_imdb_rating = get_val(row, "IMDb Rating", "imdb_rating", "avg_rating")
+            imdb_rating = None
+            if raw_imdb_rating is not None:
+                try:
+                    imdb_rating = float(raw_imdb_rating)
+                    imdb_rating = max(0.0, min(10.0, imdb_rating))
+                except (ValueError, TypeError):
+                    imdb_rating = None
+
+            # Year
+            raw_year = get_val(row, "Year", "year", "release_year")
+            year = None
+            if raw_year is not None:
+                try:
+                    year = int(float(raw_year))
+                except (ValueError, TypeError):
+                    year = None
+
+            genres = clean_list_field(get_val(row, "Genres", "genres", default=""))
+            directors = clean_list_field(get_val(row, "Directors", "directors", "director", default=""))
+
+            date_rated = get_val(row, "Date Rated", "date_rated")
+            notes = f"Rated on {date_rated}" if date_rated else ""
+
+            # Status: if user provided a rating, mark watched; otherwise use default_status
+            status = "watched" if user_rating is not None else default_status
+
+            item = MediaModel(
+                id=const_id,
+                title=title,
+                media_type=media_type,
+                user_rating=user_rating,
+                imdb_rating=imdb_rating,
+                year=year,
+                genres=genres,
+                directors=directors,
+                status=status,
+                notes=notes,
+                updated_at=datetime.now(timezone.utc),
+            )
+            media_items.append(item)
+
+        return media_items
+
+    def parse_file(self, file_path: str, default_status: str = "watched") -> List[MediaModel]:
+        """Parses a single IMDb CSV file (ratings or watchlist)."""
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"IMDb CSV file not found: {file_path}")
+
+        print(f"🎬 Reading IMDb CSV: {path.name}...")
+        df = pd.read_csv(path, dtype=str)
+        return self.parse_dataframe(df, default_status=default_status)
+
+    def parse_imdb_files(
+        self,
+        ratings_path: Optional[str] = None,
+        watchlist_path: Optional[str] = None,
+    ) -> List[MediaModel]:
+        """
+        Parses watchlist and/or ratings files and merges them.
+        If a title appears in both, the rated version (with watched status and rating) takes precedence.
+        """
+        if not ratings_path and not watchlist_path:
+            raise ValueError("Must provide at least one of ratings_path or watchlist_path")
+
+        all_items: Dict[str, MediaModel] = {}
+
+        if watchlist_path:
+            watch_items = self.parse_file(watchlist_path, default_status="watchlist")
+            for item in watch_items:
+                all_items[item.id] = item
+            print(f"  ↳ Loaded {len(watch_items)} watchlist items.")
+
+        if ratings_path:
+            rate_items = self.parse_file(ratings_path, default_status="watched")
+            for item in rate_items:
+                all_items[item.id] = item
+            print(f"  ↳ Loaded {len(rate_items)} rated items.")
+
+        media_list = list(all_items.values())
+        print(f"✅ Total unique media items parsed: {len(media_list)}")
+        return media_list
+
+    def import_files(
+        self,
+        ratings_path: Optional[str] = None,
+        watchlist_path: Optional[str] = None,
+    ) -> int:
+        """Parses and ingests IMDb ratings and/or watchlist files in batches of 500."""
+        media_list = self.parse_imdb_files(ratings_path=ratings_path, watchlist_path=watchlist_path)
+        return self.upsert_batch(media_list)
+
+
 def parse_imdb_dataframe(df: pd.DataFrame, default_status: str) -> List[MediaModel]:
-    """
-    Parses IMDb export dataframe into MediaModel instances.
-    Extracts Const, Your Rating, Date Rated, Title, Title Type, IMDb Rating, Year, Genres, Directors.
-    """
-    col_map = {}
-    for col in df.columns:
-        norm = col.strip().lower().replace(" ", "_").replace("-", "_")
-        col_map[norm] = col
-
-    def get_val(row, *candidates, default=None):
-        for c in candidates:
-            c_norm = c.lower().replace(" ", "_").replace("-", "_")
-            if c_norm in col_map:
-                val = row[col_map[c_norm]]
-                if not pd.isna(val) and val is not None and str(val).strip() != "":
-                    return val
-        return default
-
-    media_items: List[MediaModel] = []
-
-    for _, row in df.iterrows():
-        const_id = get_val(row, "Const", "const", "imdb_id", "id")
-        if not const_id:
-            continue
-        const_id = str(const_id).strip()
-
-        title = str(get_val(row, "Title", "title", default="Untitled")).strip()
-        media_type = str(get_val(row, "Title Type", "title_type", "type", default="movie")).strip()
-
-        # User rating
-        raw_user_rating = get_val(row, "Your Rating", "your_rating", "user_rating", "rating")
-        user_rating = None
-        if raw_user_rating is not None:
-            try:
-                user_rating = int(float(raw_user_rating))
-                user_rating = max(1, min(10, user_rating))
-            except (ValueError, TypeError):
-                user_rating = None
-
-        # IMDb rating
-        raw_imdb_rating = get_val(row, "IMDb Rating", "imdb_rating", "avg_rating")
-        imdb_rating = None
-        if raw_imdb_rating is not None:
-            try:
-                imdb_rating = float(raw_imdb_rating)
-                imdb_rating = max(0.0, min(10.0, imdb_rating))
-            except (ValueError, TypeError):
-                imdb_rating = None
-
-        # Year
-        raw_year = get_val(row, "Year", "year", "release_year")
-        year = None
-        if raw_year is not None:
-            try:
-                year = int(float(raw_year))
-            except (ValueError, TypeError):
-                year = None
-
-        genres = clean_list_field(get_val(row, "Genres", "genres", default=""))
-        directors = clean_list_field(get_val(row, "Directors", "directors", "director", default=""))
-
-        date_rated = get_val(row, "Date Rated", "date_rated")
-        notes = f"Rated on {date_rated}" if date_rated else ""
-
-        # Status: if user provided a rating, mark watched; otherwise use default_status
-        status = "watched" if user_rating is not None else default_status
-
-        item = MediaModel(
-            id=const_id,
-            title=title,
-            media_type=media_type,
-            user_rating=user_rating,
-            imdb_rating=imdb_rating,
-            year=year,
-            genres=genres,
-            directors=directors,
-            status=status,
-            notes=notes,
-            updated_at=datetime.now(timezone.utc),
-        )
-        media_items.append(item)
-
-    return media_items
+    """Backwards-compatible wrapper function for parse_dataframe."""
+    importer = IMDbImporter()
+    return importer.parse_dataframe(df, default_status=default_status)
 
 
 def ingest_imdb_files(
@@ -123,75 +186,9 @@ def ingest_imdb_files(
     watchlist_path: Optional[str] = None,
     dry_run: bool = False,
 ) -> int:
-    """
-    Ingests IMDb ratings and/or watchlist CSV files into Firestore 'media' collection in 500-doc batches.
-    """
-    if not ratings_path and not watchlist_path:
-        raise ValueError("Must provide at least one of --ratings or --watchlist")
-
-    all_items: Dict[str, MediaModel] = {}
-
-    # Parse watchlist first (so ratings can overwrite/upgrade status to 'watched' if duplicate)
-    if watchlist_path:
-        p_watch = Path(watchlist_path)
-        if not p_watch.exists():
-            raise FileNotFoundError(f"Watchlist file not found: {watchlist_path}")
-        print(f"🎬 Reading IMDb Watchlist CSV: {p_watch.name}...")
-        df_watch = pd.read_csv(p_watch, dtype=str)
-        watch_items = parse_imdb_dataframe(df_watch, default_status="watchlist")
-        for item in watch_items:
-            all_items[item.id] = item
-        print(f"  ↳ Loaded {len(watch_items)} watchlist items.")
-
-    # Parse ratings second
-    if ratings_path:
-        p_rate = Path(ratings_path)
-        if not p_rate.exists():
-            raise FileNotFoundError(f"Ratings file not found: {ratings_path}")
-        print(f"⭐ Reading IMDb Ratings CSV: {p_rate.name}...")
-        df_rate = pd.read_csv(p_rate, dtype=str)
-        rate_items = parse_imdb_dataframe(df_rate, default_status="watched")
-        for item in rate_items:
-            all_items[item.id] = item
-        print(f"  ↳ Loaded {len(rate_items)} rated items.")
-
-    media_list = list(all_items.values())
-    total = len(media_list)
-    print(f"✅ Total unique media items to upsert: {total}")
-
-    if dry_run:
-        print(f"🔍 [DRY RUN] Would write {total} media items to Firestore 'media' collection.")
-        if media_list:
-            sample = media_list[0].to_firestore_dict()
-            print(f"Sample media record:\n{sample}")
-        return total
-
-    client = get_db()
-    media_ref = client.collection("media")
-
-    written = 0
-    current_batch = client.batch()
-    batch_count = 0
-
-    for item in media_list:
-        doc_ref = media_ref.document(item.id)
-        current_batch.set(doc_ref, item.to_firestore_dict(), merge=True)
-        batch_count += 1
-
-        if batch_count >= BATCH_SIZE:
-            current_batch.commit()
-            written += batch_count
-            print(f"  ↳ Committed batch of {batch_count} records ({written}/{total})...")
-            current_batch = client.batch()
-            batch_count = 0
-
-    if batch_count > 0:
-        current_batch.commit()
-        written += batch_count
-        print(f"  ↳ Committed final batch of {batch_count} records ({written}/{total}).")
-
-    print(f"🎉 Complete! Successfully upserted {written} media items into Firestore collection 'media'.")
-    return written
+    """Backwards-compatible wrapper function for IMDb ingestion."""
+    importer = IMDbImporter(dry_run=dry_run)
+    return importer.import_files(ratings_path=ratings_path, watchlist_path=watchlist_path)
 
 
 def main():

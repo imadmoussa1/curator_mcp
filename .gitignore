@@ -35,6 +35,10 @@ venv.bak/
 service-account*.json
 .runtimeconfig.json
 
+# User Data & CSV Exports
+*.csv
+!sample_data/*.csv
+
 # IDEs & OS
 .DS_Store
 .idea/
