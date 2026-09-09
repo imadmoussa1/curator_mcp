@@ -308,7 +308,33 @@ In Docker Desktop:
 
 ---
 
-### Option B: 🐍 Direct Python Virtualenv
+### Option B: ⚡ Run with Astral `uv` / `uvx` (Fastest Python Execution)
+
+If you have `uv` installed, you don't even need to create or manage virtualenvs manually:
+
+```json
+{
+  "mcpServers": {
+    "curator-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/path/to/curator_mcp",
+        "mcp_server.py"
+      ],
+      "env": {
+        "FIREBASE_CREDENTIALS_PATH": "/path/to/curator_mcp/service-account.json",
+        "TMDB_API_KEY": "YOUR_TMDB_API_KEY_HERE"
+      }
+    }
+  }
+}
+```
+
+---
+
+### Option C: 🐍 Direct Python Virtualenv
 
 Add the following configuration to `claude_desktop_config.json`:
 
