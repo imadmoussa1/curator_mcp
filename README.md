@@ -274,6 +274,80 @@ Add the following configuration to your MCP config file (e.g. `claude_desktop_co
 
 ---
 
+## 💬 Example Prompts to Ask Claude (Feature-by-Feature Guide)
+
+Once Curator MCP is connected to **Claude Desktop**, you can interact naturally using prompts like these:
+
+### 1. 🎁 Annual Retrospective & Taste Analysis
+- *"Analyze my entertainment taste profile based on my books and movies."*
+  - 👉 **Tool called**: `get_user_taste_profile`
+- *"Generate my Curator Wrapped annual summary for 2026 and tell me what my Cultural Archetype is!"*
+  - 👉 **Tool called**: `generate_cultural_wrapped(year=2026)`
+- *"Give me a high-level breakdown of my stats across books, movies, quotes, and podcasts."*
+  - 👉 **Tool called**: `get_entertainment_stats`
+
+### 2. ⏱️ "Curate My Night" (Evening Movie Picker)
+- *"I have 90 minutes tonight and want a great comedy or drama from my watchlist. Pick something for me."*
+  - 👉 **Tool called**: `curate_for_tonight(max_runtime_mins=90, genre='Comedy')`
+- *"What's a high-rated thriller on my watchlist that I should watch tonight?"*
+  - 👉 **Tool called**: `curate_for_tonight(genre='Thriller', min_imdb_rating=8.0)`
+
+### 3. 📺 "Where to Stream" (Streaming Availability)
+- *"Where can I stream 'Inception' or 'The Philadelphia Story' right now in the US?"*
+  - 👉 **Tool called**: `get_streaming_providers(title='Inception', country='US')`
+- *"Is 'Interstellar' streaming on Netflix, Prime, or Max in the UK?"*
+  - 👉 **Tool called**: `get_streaming_providers(title='Interstellar', country='GB')`
+
+### 4. 🧠 Smart AI Recommendations (Library Deduplicated)
+- *"Recommend 3 movies and 3 books based on my 10/10 and 5-star favorites that I haven't watched or read yet."*
+  - 👉 **Tool called**: `get_smart_recommendations(category='all', limit=3)`
+- *"Find books similar in themes and style to 'Thinking, Fast and Slow'."*
+  - 👉 **Tool called**: `find_similar_books_online(title='Thinking, Fast and Slow')`
+- *"Find movies similar to 'Blade Runner 2049'."*
+  - 👉 **Tool called**: `find_similar_media_online(title='Blade Runner 2049')`
+
+### 5. 🕒 Viewing & Reading History (Chronological)
+- *"What was the last thing I watched and rated?"*
+  - 👉 **Tool called**: `get_recently_watched_media(limit=5)`
+- *"What was the last book I read and rated?"*
+  - 👉 **Tool called**: `get_recently_read_books(limit=5)`
+- *"I just finished watching 'Dune: Part Two'. Log it as watched, rate it 9/10, and add notes: 'Spectacular sound design'."*
+  - 👉 **Tool called**: `log_watched_media(title='Dune: Part Two', user_rating=9, ...)`
+- *"I just finished 'Atomic Habits' by James Clear. Log it as read with a 5/5 star rating."*
+  - 👉 **Tool called**: `log_read_book(title='Atomic Habits', author='James Clear', user_rating=5)`
+
+### 6. 📋 Active Queues & Watchlists
+- *"What movies and series do I have on my watchlist?"*
+  - 👉 **Tool called**: `get_watchlist(limit=10)`
+- *"What books do I have on my to-read shelf?"*
+  - 👉 **Tool called**: `get_reading_list(shelf='to-read')`
+- *"Add 'Oppenheimer' to my movie watchlist."*
+  - 👉 **Tool called**: `add_to_watchlist(title='Oppenheimer')`
+- *"Add 'Project Hail Mary' by Andy Weir to my reading list."*
+  - 👉 **Tool called**: `add_to_reading_list(title='Project Hail Mary', author='Andy Weir')`
+
+### 7. 💬 Quotes & Mental Models
+- *"Give me a random memorable quote from my database for inspiration today."*
+  - 👉 **Tool called**: `get_random_quote`
+- *"Save this quote from Fight Club: 'The things you own end up owning you.' Tag it with #consumerism and #freedom."*
+  - 👉 **Tool called**: `add_quote(quote_text='...', source_title='Fight Club', theme_tags=['consumerism', 'freedom'])`
+- *"Search my saved quotes for anything related to discipline or stoicism."*
+  - 👉 **Tool called**: `search_quotes(query='discipline')`
+- *"Show me my all-time favorite quotes."*
+  - 👉 **Tool called**: `list_favorite_quotes`
+
+### 8. 🎙️ Podcast Tracking & Online Discovery
+- *"Queue up the Huberman Lab episode on dopamine to listen to later."*
+  - 👉 **Tool called**: `add_to_podcast_queue(podcast_name='Huberman Lab', episode_title='Dopamine')`
+- *"I just finished Lex Fridman #400 with Daniel Kahneman. Rate it 9/10 with key takeaway: 'System 1 vs System 2 thinking'."*
+  - 👉 **Tool called**: `log_listened_podcast(podcast_name='Lex Fridman', ...)`
+- *"Search online for podcast shows about neuroscience."*
+  - 👉 **Tool called**: `lookup_podcast_online(query='neuroscience')`
+- *"What episodes are currently in my podcast queue?"*
+  - 👉 **Tool called**: `get_podcast_queue`
+
+---
+
 ## 🔒 Security & Privacy Notice
 
 This project is built for **public open-source publication** and adheres to strict security best practices:
@@ -293,7 +367,7 @@ This project is built for **public open-source publication** and adheres to stri
 The codebase includes an automated unit test suite:
 
 ```bash
-# Run all 21 unit tests
+# Run all 24 unit tests
 .venv/bin/python -m unittest discover -s tests
 ```
 
