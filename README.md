@@ -194,19 +194,22 @@ python -m importers.imdb_importer --watchlist path/to/watchlist.csv
 
 ## 🛠️ Model Context Protocol (MCP) Tools
 
-The server registers **25 specialized tools** categorized across five domains:
+The server registers **28 specialized tools** categorized across five domains:
 
-### 1. Taste Profile & Recommendations
+### 1. Taste Profile, Curate My Night & Annual Wrapped
 | Tool Name | Parameters | Description |
 |---|---|---|
 | `get_user_taste_profile` | *none* | Aggregates favorite genres, top directors, authors, and 5★/10★ items. |
 | `get_entertainment_stats` | *none* | Macro metrics across books, media, quotes, and podcasts. |
-| `get_smart_recommendations` | `category`, `limit` | Intelligent AI recommender that queries similar items and automatically excludes consumed or queued titles. |
+| `get_smart_recommendations` | `category`, `limit` | Intelligent AI recommender that queries similar items and excludes consumed/queued titles. |
+| `curate_for_tonight` | `max_runtime_mins`, `genre`, `min_imdb_rating`, `media_type`, `count` | Smart evening picker that filters watchlist by runtime, mood, and ratings with match reasons. |
+| `generate_cultural_wrapped` | `year` | Comprehensive annual cultural retrospective with metrics and synthesized "Cultural Archetype". |
 
 ### 2. Books Management & Discovery
 | Tool Name | Parameters | Description |
 |---|---|---|
 | `search_books` | `query`, `shelf`, `limit` | Search Firestore library by title or author keywords. |
+| `get_recently_read_books` | `limit` | Retrieve finished books sorted chronologically by completion date. |
 | `get_reading_list` | `shelf`, `limit` | Retrieve books from `to-read` or `currently-reading` queues. |
 | `add_to_reading_list` | `title`, `author`, `notes` | Add a recommended book directly to the reading queue. |
 | `log_read_book` | `title`, `author`, `user_rating`, `notes`, `date_read` | Log a finished book with 0–5 rating and notes. |
@@ -214,14 +217,16 @@ The server registers **25 specialized tools** categorized across five domains:
 | `lookup_book_online` | `title`, `author` | Query Google Books & Open Library for synopses and covers. |
 | `find_similar_books_online` | `title`, `author`, `limit` | Discover books similar in theme and author style. |
 
-### 3. Media (Movies & TV) Management & Discovery
+### 3. Media (Movies & TV) Management & Streaming
 | Tool Name | Parameters | Description |
 |---|---|---|
 | `search_media` | `query`, `media_type`, `status`, `limit` | Search movies and series by title or director. |
+| `get_recently_watched_media` | `limit`, `media_type` | Retrieve viewed movies/series sorted chronologically by rating date. |
 | `get_watchlist` | `media_type`, `genre`, `limit` | Retrieve watchlist items with optional genre filter. |
 | `add_to_watchlist` | `title`, `media_type`, `year`, `genres`, `directors`, `notes` | Add a movie or show to the watchlist. |
 | `log_watched_media` | `title`, `media_type`, `user_rating`, `notes` | Log a viewed film/series with 1–10 rating. |
 | `get_media_details` | `media_id` | Fetch complete record by IMDb Const ID (`tt...`). |
+| `get_streaming_providers` | `title`, `media_type`, `country` | Check where a title is streaming (Netflix, Max, Prime, Apple TV+) via TMDB / JustWatch. |
 | `lookup_media_online` | `title`, `media_type`, `year` | Query TMDB for synopsis, posters, and vote average. |
 | `find_similar_media_online` | `title`, `media_type`, `limit` | Query TMDB recommendation algorithm for similar titles. |
 

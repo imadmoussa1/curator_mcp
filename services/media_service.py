@@ -201,3 +201,82 @@ class MediaService(BaseFirestoreRepository):
             "types": dict(type_counts),
             "avg_user_rating": avg_rating,
         }
+
+    def curate_for_tonight(
+        self,
+        max_runtime_mins: Optional[int] = None,
+        genre: Optional[str] = None,
+        min_imdb_rating: Optional[float] = None,
+        media_type: Optional[str] = "movie",
+        count: int = 3
+    ) -> Dict[str, Any]:
+        """
+        Smart curation engine for your evening.
+        Filters your watchlist by available time (runtime), mood (genre), and minimum IMDb rating,
+        and provides personalized recommendations with context.
+        """
+        watchlist = self.filter_by("status", "==", "watchlist")
+        candidates = []
+
+        g_norm = genre.lower().strip() if genre else None
+        mtype_norm = media_type.lower().strip() if media_type else None
+
+        for m in watchlist:
+            if mtype_norm and m.get("media_type", "").lower() != mtype_norm:
+                continue
+
+            genres = [g.lower() for g in m.get("genres", [])]
+            if g_norm and not any(g_norm in g for g in genres):
+                continue
+
+            imdb_rating = m.get("imdb_rating") or 0.0
+            if min_imdb_rating and imdb_rating < min_imdb_rating:
+                continue
+
+            runtime = m.get("runtime_mins")
+            if max_runtime_mins and runtime and runtime > max_runtime_mins:
+                continue
+
+            candidates.append(m)
+
+        candidates.sort(
+            key=lambda x: (x.get("imdb_rating") or 0.0, x.get("year") or 0),
+            reverse=True
+        )
+
+        selected = candidates[:count]
+        picks = []
+        for c in selected:
+            runtime_str = f"{c.get('runtime_mins')} mins" if c.get("runtime_mins") else "Runtime unlisted"
+            reason_parts = []
+            if c.get("imdb_rating"):
+                reason_parts.append(f"Strong community rating ({c.get('imdb_rating')}/10)")
+            if c.get("directors"):
+                reason_parts.append(f"Directed by {', '.join(c.get('directors'))}")
+            if c.get("runtime_mins"):
+                reason_parts.append(f"Fits runtime ({runtime_str})")
+
+            picks.append({
+                "id": c.get("id"),
+                "title": c.get("title"),
+                "year": c.get("year"),
+                "media_type": c.get("media_type"),
+                "imdb_rating": c.get("imdb_rating"),
+                "runtime": runtime_str,
+                "genres": c.get("genres", []),
+                "directors": c.get("directors", []),
+                "why_this_fits": " • ".join(reason_parts),
+                "notes": c.get("notes", ""),
+            })
+
+        return {
+            "status": "success",
+            "filters_applied": {
+                "max_runtime_mins": max_runtime_mins,
+                "genre": genre,
+                "min_imdb_rating": min_imdb_rating,
+                "media_type": media_type,
+            },
+            "total_matches_in_watchlist": len(candidates),
+            "curated_picks": picks,
+        }

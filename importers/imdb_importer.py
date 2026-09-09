@@ -99,6 +99,17 @@ class IMDbImporter(BaseImporter):
                 except (ValueError, TypeError):
                     year = None
 
+            # Runtime
+            raw_runtime = get_val(row, "Runtime (mins)", "runtime_mins", "runtime")
+            runtime_mins = None
+            if raw_runtime is not None:
+                try:
+                    runtime_mins = int(float(raw_runtime))
+                    if runtime_mins <= 0:
+                        runtime_mins = None
+                except (ValueError, TypeError):
+                    runtime_mins = None
+
             genres = clean_list_field(get_val(row, "Genres", "genres", default=""))
             directors = clean_list_field(get_val(row, "Directors", "directors", "director", default=""))
 
@@ -117,6 +128,7 @@ class IMDbImporter(BaseImporter):
                 year=year,
                 genres=genres,
                 directors=directors,
+                runtime_mins=runtime_mins,
                 status=status,
                 notes=notes,
                 updated_at=datetime.now(timezone.utc),

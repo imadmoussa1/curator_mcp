@@ -61,6 +61,7 @@ class MediaModel(BaseModel):
     year: Optional[int] = Field(default=None, description="Release year")
     genres: List[str] = Field(default_factory=list, description="List of genres")
     directors: List[str] = Field(default_factory=list, description="List of directors")
+    runtime_mins: Optional[int] = Field(default=None, ge=1, description="Runtime in minutes")
     status: str = Field(
         default="watchlist",
         description="Status: watched or watchlist"

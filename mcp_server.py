@@ -44,6 +44,8 @@ recommendation_service = RecommendationService(
     media_service=media_service,
     books_client=books_client,
     tmdb_client=tmdb_client,
+    quote_service=quote_service,
+    podcast_service=podcast_service,
 )
 
 
@@ -88,6 +90,19 @@ def get_smart_recommendations(category: str = "all", limit: int = 5) -> Dict[str
         limit: Max recommendations per category
     """
     return recommendation_service.get_smart_recommendations(category=category, limit=limit)
+
+
+@mcp.tool()
+def generate_cultural_wrapped(year: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Generate an all-in-one 'Curator Wrapped' annual retrospective summarizing the user's intellectual
+    and entertainment year across Books, Movies/Series, Podcasts, and Quotes.
+    Includes total counts, average ratings, top directors/authors, masterpieces, and a dynamic
+    'Cultural Archetype' persona (e.g. 'The Cybernetic Stoic', 'The Inquisitive Realist').
+    Args:
+        year: Target year (e.g. 2026). If omitted, analyzes all-time or latest activity.
+    """
+    return recommendation_service.generate_cultural_wrapped(year=year)
 
 
 # ============================================================================
@@ -308,6 +323,44 @@ def find_similar_media_online(title: str, media_type: str = "movie", limit: int 
     Requires TMDB_API_KEY in .env.
     """
     return tmdb_client.find_similar(title=title, media_type=media_type, limit=limit)
+
+
+@mcp.tool()
+def get_streaming_providers(title: str, media_type: str = "movie", country: str = "US") -> Dict[str, Any]:
+    """
+    Check where a movie or TV show is currently streaming (Netflix, HBO Max, Prime, Apple TV+, etc.),
+    available to rent, or buy via TMDB / JustWatch.
+    Args:
+        title: Movie or series title
+        media_type: 'movie' or 'tv'
+        country: ISO country code (default 'US', also 'GB', 'CA', 'AU', etc.)
+    """
+    return tmdb_client.get_watch_providers(title=title, media_type=media_type, country=country)
+
+
+@mcp.tool()
+def curate_for_tonight(
+    max_runtime_mins: Optional[int] = None,
+    genre: Optional[str] = None,
+    min_imdb_rating: Optional[float] = None,
+    media_type: Optional[str] = "movie",
+    count: int = 3
+) -> Dict[str, Any]:
+    """
+    Smart evening curation engine. Filters your watchlist by your available time (runtime in minutes),
+    mood (genre like 'Sci-Fi', 'Thriller', 'Comedy'), and minimum IMDb rating.
+    Gemini / Claude should call this when the user asks:
+    - 'I have 90 minutes tonight, what should I watch from my watchlist?'
+    - 'Pick a great comedy under 100 minutes from my watchlist.'
+    - 'What's a high-rated thriller to watch tonight?'
+    """
+    return media_service.curate_for_tonight(
+        max_runtime_mins=max_runtime_mins,
+        genre=genre,
+        min_imdb_rating=min_imdb_rating,
+        media_type=media_type,
+        count=count,
+    )
 
 
 # ============================================================================

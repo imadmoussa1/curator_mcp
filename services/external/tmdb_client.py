@@ -152,3 +152,84 @@ class TMDBClient:
             },
             "recommendations": recommendations,
         }
+
+    def get_watch_providers(
+        self,
+        title: str,
+        media_type: str = "movie",
+        country: str = "US"
+    ) -> Dict[str, Any]:
+        """
+        Lookup streaming providers (subscription, rental, buy) via TMDB / JustWatch data.
+        Args:
+            title: Movie or series title
+            media_type: 'movie' or 'tv'
+            country: ISO 3166-1 alpha-2 country code (default 'US', also 'GB', 'CA', etc.)
+        """
+        if not self.api_key:
+            return {
+                "status": "config_required",
+                "message": "TMDB_API_KEY is not set in .env. Get a free API key at "
+                           "https://www.themoviedb.org/settings/api to enable streaming lookups."
+            }
+
+        search_res = self.search(title, media_type=media_type)
+        if not search_res or "error" in search_res[0] or "status" in search_res[0]:
+            return {
+                "status": "error",
+                "message": f"Could not find title '{title}' on TMDB to check streaming availability."
+            }
+
+        seed = search_res[0]
+        tmdb_id = seed.get("tmdb_id")
+        endpoint_type = "movie" if "movie" in media_type.lower() else "tv"
+
+        headers, params = self._headers_and_params()
+        url = f"{self.BASE_URL}/{endpoint_type}/{tmdb_id}/watch/providers"
+
+        try:
+            resp = self.session.get(url, headers=headers, params=params, timeout=self.timeout)
+            resp.raise_for_status()
+            data = resp.json().get("results", {})
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to fetch streaming providers: {str(e)}"
+            }
+
+        country_code = country.strip().upper()
+        country_data = data.get(country_code, {})
+
+        if not country_data:
+            avail_countries = list(data.keys())
+            return {
+                "status": "not_available_in_country",
+                "title": seed.get("title"),
+                "country": country_code,
+                "message": f"No streaming providers currently reported for {country_code}.",
+                "available_in_countries": avail_countries[:10],
+            }
+
+        def clean_providers(prov_list):
+            if not prov_list:
+                return []
+            return [
+                {
+                    "provider_name": p.get("provider_name"),
+                    "provider_id": p.get("provider_id"),
+                    "logo_url": f"https://image.tmdb.org/t/p/original{p.get('logo_path')}" if p.get("logo_path") else ""
+                }
+                for p in prov_list
+            ]
+
+        return {
+            "status": "success",
+            "title": seed.get("title"),
+            "media_type": endpoint_type,
+            "country": country_code,
+            "justwatch_link": country_data.get("link", ""),
+            "streaming_subscriptions": clean_providers(country_data.get("flatrate")),
+            "rent": clean_providers(country_data.get("rent")),
+            "buy": clean_providers(country_data.get("buy")),
+            "free": clean_providers(country_data.get("free") or country_data.get("ads")),
+        }
