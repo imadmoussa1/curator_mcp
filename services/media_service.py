@@ -24,7 +24,7 @@ class MediaService(BaseFirestoreRepository):
 
     def search(
         self,
-        query: str,
+        query: str = "",
         media_type: Optional[str] = None,
         status: Optional[str] = None,
         limit: int = 10
@@ -41,7 +41,7 @@ class MediaService(BaseFirestoreRepository):
                 continue
             title = (m.get("title") or "").lower()
             directors = [d.lower() for d in m.get("directors", [])]
-            if q_norm in title or any(q_norm in d for d in directors):
+            if not q_norm or q_norm in title or any(q_norm in d for d in directors):
                 matches.append({
                     "id": m.get("id"),
                     "title": m.get("title"),
@@ -52,10 +52,39 @@ class MediaService(BaseFirestoreRepository):
                     "status": m.get("status"),
                     "genres": m.get("genres", []),
                     "directors": m.get("directors", []),
+                    "notes": m.get("notes"),
                 })
                 if len(matches) >= limit:
                     break
         return matches
+
+    def get_recently_watched(self, limit: int = 10, media_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Retrieve most recently watched and rated movies or series, sorted by date rated descending."""
+        docs = self.filter_by("status", "==", "watched")
+        items = []
+        for m in docs:
+            if media_type and m.get("media_type", "").lower() != media_type.lower():
+                continue
+            notes = m.get("notes") or ""
+            match = re.search(r"Rated on (\d{4}-\d{2}-\d{2})", notes)
+            date_rated = match.group(1) if match else "1970-01-01"
+            items.append({
+                "id": m.get("id"),
+                "title": m.get("title"),
+                "media_type": m.get("media_type"),
+                "year": m.get("year"),
+                "user_rating": m.get("user_rating"),
+                "imdb_rating": m.get("imdb_rating"),
+                "date_rated": date_rated if date_rated != "1970-01-01" else None,
+                "genres": m.get("genres", []),
+                "directors": m.get("directors", []),
+                "notes": notes,
+                "_sort_date": date_rated,
+            })
+        items.sort(key=lambda x: x["_sort_date"], reverse=True)
+        for it in items:
+            it.pop("_sort_date", None)
+        return items[:limit]
 
     def get_watchlist(
         self,

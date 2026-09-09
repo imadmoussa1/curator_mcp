@@ -22,7 +22,7 @@ class BookService(BaseFirestoreRepository):
         slug = re.sub(r"[^a-zA-Z0-9]+", "_", f"{title}_{author}".lower()).strip("_")
         return f"gr_{slug[:25]}_{uuid.uuid4().hex[:6]}"
 
-    def search(self, query: str, shelf: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+    def search(self, query: str = "", shelf: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
         """Search books by title or author keywords with optional shelf filter."""
         q_norm = query.strip().lower()
         matches = []
@@ -33,7 +33,7 @@ class BookService(BaseFirestoreRepository):
                 continue
             title = (b.get("title") or "").lower()
             author = (b.get("author") or "").lower()
-            if q_norm in title or q_norm in author:
+            if not q_norm or q_norm in title or q_norm in author:
                 matches.append({
                     "id": b.get("id"),
                     "title": b.get("title"),
@@ -41,11 +41,34 @@ class BookService(BaseFirestoreRepository):
                     "user_rating": b.get("user_rating"),
                     "avg_rating": b.get("avg_rating"),
                     "shelf": b.get("shelf"),
+                    "date_read": b.get("date_read"),
                     "notes": b.get("notes_and_reviews"),
                 })
                 if len(matches) >= limit:
                     break
         return matches
+
+    def get_recently_read(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Retrieve most recently finished and rated books, sorted by date read descending."""
+        docs = self.filter_by("shelf", "==", "read")
+        items = []
+        for b in docs:
+            d_read = b.get("date_read") or "1970-01-01"
+            items.append({
+                "id": b.get("id"),
+                "title": b.get("title"),
+                "author": b.get("author"),
+                "user_rating": b.get("user_rating"),
+                "avg_rating": b.get("avg_rating"),
+                "shelf": b.get("shelf"),
+                "date_read": b.get("date_read"),
+                "notes": b.get("notes_and_reviews"),
+                "_sort_date": d_read,
+            })
+        items.sort(key=lambda x: x["_sort_date"], reverse=True)
+        for it in items:
+            it.pop("_sort_date", None)
+        return items[:limit]
 
     def get_reading_list(self, shelf: str = "to-read", limit: int = 20) -> List[Dict[str, Any]]:
         """Retrieve books from user's reading queue ('to-read' or 'currently-reading')."""

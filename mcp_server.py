@@ -95,12 +95,24 @@ def get_smart_recommendations(category: str = "all", limit: int = 5) -> Dict[str
 # ============================================================================
 
 @mcp.tool()
-def search_books(query: str, shelf: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+def search_books(query: str = "", shelf: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
     """
     Search books in Firestore library by title or author keywords with optional shelf filter
     ('read', 'currently-reading', 'to-read').
     """
     return book_service.search(query=query, shelf=shelf, limit=limit)
+
+
+@mcp.tool()
+def get_recently_read_books(limit: int = 10) -> List[Dict[str, Any]]:
+    """
+    Retrieve the most recently finished and rated books, sorted chronologically by date read descending.
+    Gemini / Claude should call this when the user asks:
+    - 'What was the last book I read and rated?'
+    - 'What did I read recently?'
+    - 'Show my recent reading history.'
+    """
+    return book_service.get_recently_read(limit=limit)
 
 
 @mcp.tool()
@@ -181,7 +193,7 @@ def find_similar_books_online(title: str, author: Optional[str] = None, limit: i
 
 @mcp.tool()
 def search_media(
-    query: str,
+    query: str = "",
     media_type: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = 10
@@ -190,6 +202,18 @@ def search_media(
     Search movies and TV shows in Firestore library by title or director keywords.
     """
     return media_service.search(query=query, media_type=media_type, status=status, limit=limit)
+
+
+@mcp.tool()
+def get_recently_watched_media(limit: int = 10, media_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Retrieve the most recently watched and rated movies or TV series, sorted chronologically by rating date descending.
+    Gemini / Claude should call this when the user asks:
+    - 'What was the last thing I watched and rated?'
+    - 'What movies did I watch recently?'
+    - 'Show my recent viewing history.'
+    """
+    return media_service.get_recently_watched(limit=limit, media_type=media_type)
 
 
 @mcp.tool()
