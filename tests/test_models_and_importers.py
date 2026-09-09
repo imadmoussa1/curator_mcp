@@ -1,5 +1,5 @@
 """
-Unit tests for models and CSV parsing logic in life_os_mcp.
+Unit tests for models and CSV parsing logic in Curator MCP.
 Can be executed without live Firebase credentials.
 """
 

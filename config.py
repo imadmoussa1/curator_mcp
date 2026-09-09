@@ -1,5 +1,5 @@
 """
-Configuration and Firebase initialization for life_os_mcp.
+Configuration and Firebase initialization for Curator MCP.
 Loads environment variables and sets up the Google Cloud Firestore client.
 """
 

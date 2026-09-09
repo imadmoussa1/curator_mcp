@@ -1,5 +1,5 @@
 """
-IMDb CSV Importer for life_os_mcp.
+IMDb CSV Importer for Curator MCP.
 Ingests IMDb ratings.csv and watchlist.csv exports into the Firestore 'media' collection.
 
 OOP Senior Architecture: Subclasses BaseImporter with typed parsing and validation.

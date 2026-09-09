@@ -1,5 +1,5 @@
 """
-FastMCP Server for life_os_mcp (Personal Entertainment OS).
+FastMCP Server for Curator MCP (Personal AI Curator & Entertainment Vault).
 
 Senior Architecture Presentation Layer:
 Exposes tools for Gemini / Claude to manage:
@@ -27,7 +27,7 @@ from services import (
 )
 
 # Initialize FastMCP Server
-mcp = FastMCP("Personal-Entertainment-OS")
+mcp = FastMCP("Curator-MCP")
 
 # Dependency Injection & Service Initialization
 book_service = BookService()

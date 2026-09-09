@@ -1,4 +1,4 @@
-# Personal Entertainment OS (`life_os_mcp`)
+# Curator MCP (`curator-mcp`)
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -6,9 +6,9 @@
 [![Google Cloud Firestore](https://img.shields.io/badge/Database-Firestore-orange.svg)](https://cloud.google.com/firestore)
 [![Tests: 21 Passing](https://img.shields.io/badge/tests-21%20passing-success.svg)](#-testing--quality-assurance)
 
-A production-grade **Model Context Protocol (MCP)** server and automated data ingestion pipeline that transforms **Google Cloud Firestore** into your private, intelligent entertainment memory, knowledge vault, and AI recommendation engine.
+A production-grade **Model Context Protocol (MCP)** server and automated data ingestion pipeline that transforms **Google Cloud Firestore** into your private, intelligent entertainment memory, literature companion, knowledge vault, and AI curator.
 
-Connects natively to **Gemini**, **Claude Desktop**, and other MCP-compliant agents, enabling natural language tracking and exploration across:
+Connects natively to **Gemini**, **Claude Desktop**, **Antigravity IDE**, and other MCP-compliant agents, enabling natural language tracking and exploration across:
 1. **Books**: Library ingestion, to-read queue, currently-reading tracking, Google Books & Open Library live discovery.
 2. **Movies & TV**: IMDb ratings and watchlist ingestion, TMDB discovery, and automated similar-media recommendations.
 3. **Memorable Quotes & Mental Models**: Capturing principles, philosophies, and memorable dialogue with theme tagging and spaced retrieval.
@@ -19,7 +19,7 @@ Connects natively to **Gemini**, **Claude Desktop**, and other MCP-compliant age
 
 ## 🏛️ Clean Architecture & Design
 
-`life_os_mcp` is architected using **Domain-Driven Design (DDD)** and **Clean Architecture** principles. Rather than cramming business logic into a single file, the system is organized into modular, testable, and loosely-coupled components:
+`curator-mcp` is architected using **Domain-Driven Design (DDD)** and **Clean Architecture** principles. Rather than cramming business logic into a single file, the system is organized into modular, testable, and loosely-coupled components:
 
 ```mermaid
 graph TD
@@ -71,7 +71,7 @@ graph TD
 ## 📁 Repository Structure
 
 ```
-life_os_mcp/
+curator-mcp/
 ├── .env.example                       # Environment configuration template
 ├── .gitignore                         # Strict protection for credentials, .env, and CSVs
 ├── pyproject.toml                     # Python dependencies & build metadata
@@ -127,8 +127,8 @@ life_os_mcp/
 Clone the repository and set up a virtual environment:
 
 ```bash
-git clone https://github.com/your-username/life_os_mcp.git
-cd life_os_mcp
+git clone https://github.com/your-username/curator-mcp.git
+cd curator-mcp
 
 # Using python venv
 python3 -m venv .venv
@@ -253,13 +253,13 @@ Add the following configuration to your MCP config file (e.g. `claude_desktop_co
 ```json
 {
   "mcpServers": {
-    "personal-entertainment-os": {
-      "command": "/path/to/life_os_mcp/.venv/bin/python",
+    "curator-mcp": {
+      "command": "/path/to/curator-mcp/.venv/bin/python",
       "args": [
-        "/path/to/life_os_mcp/mcp_server.py"
+        "/path/to/curator-mcp/mcp_server.py"
       ],
       "env": {
-        "FIREBASE_CREDENTIALS_PATH": "/path/to/life_os_mcp/service-account.json",
+        "FIREBASE_CREDENTIALS_PATH": "/path/to/curator-mcp/service-account.json",
         "TMDB_API_KEY": "YOUR_TMDB_API_KEY_HERE"
       }
     }

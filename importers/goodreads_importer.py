@@ -1,5 +1,5 @@
 """
-Goodreads CSV Importer for life_os_mcp.
+Goodreads CSV Importer for Curator MCP.
 Ingests Goodreads library export CSV files into the Firestore 'books' collection.
 
 OOP Senior Architecture: Subclasses BaseImporter with typed parsing and validation.
