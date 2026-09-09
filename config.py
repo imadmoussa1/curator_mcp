@@ -5,6 +5,8 @@ Loads environment variables and sets up the Google Cloud Firestore client.
 
 import os
 import sys
+import base64
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -35,17 +37,37 @@ def get_db():
 
         if not firebase_admin._apps:
             cred = None
-            cred_path = None
 
-            if FIREBASE_CREDENTIALS_PATH:
+            # Check inline JSON / Base64 credentials first (ideal for Docker & Cloud deployments)
+            firebase_json_env = os.getenv("FIREBASE_CREDENTIALS_JSON") or os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+            firebase_b64_env = os.getenv("FIREBASE_CREDENTIALS_BASE64") or os.getenv("FIREBASE_SERVICE_ACCOUNT_BASE64")
+
+            if firebase_json_env:
+                try:
+                    cred_info = json.loads(firebase_json_env)
+                    cred = credentials.Certificate(cred_info)
+                    firebase_admin.initialize_app(cred)
+                except Exception as ex:
+                    raise RuntimeError(f"Invalid FIREBASE_CREDENTIALS_JSON provided: {ex}") from ex
+            elif firebase_b64_env:
+                try:
+                    decoded = base64.b64decode(firebase_b64_env).decode("utf-8")
+                    cred_info = json.loads(decoded)
+                    cred = credentials.Certificate(cred_info)
+                    firebase_admin.initialize_app(cred)
+                except Exception as ex:
+                    raise RuntimeError(f"Invalid FIREBASE_CREDENTIALS_BASE64 provided: {ex}") from ex
+            elif FIREBASE_CREDENTIALS_PATH:
                 cred_path = Path(FIREBASE_CREDENTIALS_PATH)
                 if not cred_path.is_absolute():
                     cred_path = BASE_DIR / cred_path
 
-            # Check specified credentials path
-            if cred_path and cred_path.exists():
-                cred = credentials.Certificate(str(cred_path))
-                firebase_admin.initialize_app(cred)
+                # Check specified credentials path
+                if cred_path and cred_path.exists():
+                    cred = credentials.Certificate(str(cred_path))
+                    firebase_admin.initialize_app(cred)
+                else:
+                    raise RuntimeError(f"Specified FIREBASE_CREDENTIALS_PATH not found: {cred_path}")
             # Check default service-account.json in project root
             elif (BASE_DIR / "service-account.json").exists():
                 cred = credentials.Certificate(str(BASE_DIR / "service-account.json"))

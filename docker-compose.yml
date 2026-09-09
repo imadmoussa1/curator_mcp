@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  curator-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: curator-mcp:latest
+    container_name: curator-mcp
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    volumes:
+      # Optional: Mount your service account credential securely into the container
+      - ./service-account.json:/app/service-account.json:ro

@@ -253,25 +253,114 @@ The server registers **30 specialized tools** categorized across five domains:
 
 ## 🔌 Connecting to MCP Clients
 
-### Claude Desktop / Gemini / Antigravity IDE Configuration
+You can connect Curator MCP to your AI clients using either **Docker Desktop (zero Python setup)** or directly via **Python Virtualenv**.
 
-Add the following configuration to your MCP config file (e.g. `claude_desktop_config.json` or `mcp_config.json`):
+### Option A: 🐳 Docker Desktop MCP / Container (Recommended — Zero Python Required)
+
+Running via Docker isolates dependencies completely: no Python version conflicts or virtual environments to activate.
+
+#### 1. Build the Docker Image
+```bash
+# Clone and build image locally
+git clone https://github.com/imadmoussa1/curator_mcp.git
+cd curator_mcp
+docker build -t curator-mcp:latest .
+```
+
+#### 2. Configure in Claude Desktop / Cursor / Antigravity via Docker
+Add this to your `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "curator-mcp": {
-      "command": "/path/to/curator-mcp/.venv/bin/python",
+      "command": "docker",
       "args": [
-        "/path/to/curator-mcp/mcp_server.py"
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "/absolute/path/to/service-account.json:/app/service-account.json:ro",
+        "-e",
+        "FIREBASE_CREDENTIALS_PATH=/app/service-account.json",
+        "-e",
+        "TMDB_API_KEY=YOUR_TMDB_KEY",
+        "-e",
+        "GOOGLE_BOOKS_API_KEY=YOUR_BOOKS_KEY",
+        "curator-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+> **💡 Zero-File Option (Environment Secret)**:
+> If you don't want to mount any files, you can encode your `service-account.json` to Base64 and pass it directly:
+> ```bash
+> -e FIREBASE_CREDENTIALS_BASE64="$(base64 -i service-account.json)"
+> ```
+
+#### 3. Docker MCP Toolkit (Docker Desktop)
+In Docker Desktop:
+1. Open **Docker Desktop Settings** > **Beta Features** > enable **Docker MCP Toolkit**.
+2. Run `curator-mcp` as a managed container or register it directly into the local Docker MCP Gateway.
+3. Your AI desktop clients will automatically detect the server without manually starting Python.
+
+---
+
+### Option B: 🐍 Direct Python Virtualenv
+
+Add the following configuration to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "curator-mcp": {
+      "command": "/path/to/curator_mcp/.venv/bin/python",
+      "args": [
+        "/path/to/curator_mcp/mcp_server.py"
       ],
       "env": {
-        "FIREBASE_CREDENTIALS_PATH": "/path/to/curator-mcp/service-account.json",
+        "FIREBASE_CREDENTIALS_PATH": "/path/to/curator_mcp/service-account.json",
         "TMDB_API_KEY": "YOUR_TMDB_API_KEY_HERE"
       }
     }
   }
 }
+```
+
+---
+
+## 🌐 Making This MCP Public & Publishing to Registries
+
+Curator MCP is fully architected for public open-source distribution without leaking user data or secrets. Here is the recommended roadmap to make it widely accessible to the global community:
+
+### 1. 📦 Publish Pre-built Container to GitHub Container Registry (GHCR) & Docker Hub
+Allow anyone to run Curator MCP with a single command without even cloning or building:
+```bash
+# Tag and push public image
+docker tag curator-mcp:latest ghcr.io/imadmoussa1/curator-mcp:latest
+docker push ghcr.io/imadmoussa1/curator-mcp:latest
+```
+Then any user worldwide can run it immediately:
+```json
+"curator-mcp": {
+  "command": "docker",
+  "args": ["run", "-i", "--rm", "-e", "FIREBASE_CREDENTIALS_JSON=...", "ghcr.io/imadmoussa1/curator-mcp:latest"]
+}
+```
+
+### 2. 🏛️ Submit to Official MCP Registries & Catalogs
+- **Smithery.ai Registry**: Run `npx -y @smithery/cli init` to add instant 1-click installation for Claude Desktop.
+- **Docker MCP Catalog**: Submit `curator-mcp` to the Docker MCP verified catalog so users can click "Install" right inside Docker Desktop.
+- **Glama.ai MCP Directory**: Submit the repository to [glama.ai/mcp/servers](https://glama.ai/mcp/servers) for global indexing and discovery.
+- **Punkpeye Awesome-MCP-Servers**: Open a PR to the curated [awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) repository under the **Entertainment & Media** category.
+
+### 3. 🐍 Publish to PyPI
+Users can install and run via `uvx` or `pipx`:
+```bash
+# Run without installing manually
+uvx curator-mcp
 ```
 
 ---
