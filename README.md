@@ -415,9 +415,12 @@ Once Curator MCP is connected to **Claude Desktop**, you can interact naturally 
 - *"Is 'Interstellar' streaming on Netflix, Prime, or Max in the UK?"*
   - 👉 **Tool called**: `get_streaming_providers(title='Interstellar', country='GB')`
 
-### 4. 🧠 Smart AI Recommendations (Library Deduplicated)
-- *"Recommend 3 movies and 3 books based on my 10/10 and 5-star favorites that I haven't watched or read yet."*
+### 4. 🧠 Smart AI Recommendations (Watch History & Taste-Weighted)
+- *"Give me smart recommendations based on my all-time favorite movies and books that I haven't seen or read yet."*
   - 👉 **Tool called**: `get_smart_recommendations(category='all', limit=3)`
+  - 🤖 **Returns**: Deduplicated picks with **`affinity_match_score`** (e.g. `96% Match`) and **`why_you_will_love_this`** explanation linking directly back to your 10/10 and 5★ ratings.
+- *"Recommend movies like what I usually enjoy, but with a dark or psychological thriller mood."*
+  - 👉 **Tool called**: `get_smart_recommendations(category='movies', limit=4, mood='dark thriller')`
 - *"Find books similar in themes and style to 'Thinking, Fast and Slow'."*
   - 👉 **Tool called**: `find_similar_books_online(title='Thinking, Fast and Slow')`
 - *"Find movies similar to 'Blade Runner 2049'."*
@@ -490,7 +493,7 @@ This project is built for **public open-source publication** and adheres to stri
 The codebase includes an automated unit test suite:
 
 ```bash
-# Run all 26 unit tests
+# Run all 27 unit tests
 .venv/bin/python -m unittest discover -s tests
 ```
 

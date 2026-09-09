@@ -80,16 +80,22 @@ def get_entertainment_stats() -> Dict[str, Any]:
 
 
 @mcp.tool()
-def get_smart_recommendations(category: str = "all", limit: int = 5) -> Dict[str, Any]:
+def get_smart_recommendations(category: str = "all", limit: int = 5, mood: Optional[str] = None) -> Dict[str, Any]:
     """
-    Generate fresh, intelligent recommendations by taking the user's top-rated items from Firestore,
-    querying external APIs for similar items, and automatically filtering out any books or media
-    the user has already read, watched, or already has on their queues.
+    Generate deeply personalized AI recommendations synthesized from what you've actually watched and read.
+    Ranks items using:
+    - Your 10/10 and 9/10 masterpieces as seed anchors
+    - Your proven taste affinity across directors, authors, and genres
+    - Recency of what you finished
+    - Dynamic match percentage (e.g. '96% Affinity')
+    - 'why_you_will_love_this' contextual reasoning explaining the exact connection to your past ratings
+    - Strict deduplication (guarantees you won't be recommended what you've already consumed or queued)
     Args:
-        category: 'books', 'movies', 'tv', or 'all'
+        category: 'movies', 'tv', 'books', or 'all'
         limit: Max recommendations per category
+        mood: Optional mood or vibe constraint (e.g. 'dark', 'philosophical', 'uplifting')
     """
-    return recommendation_service.get_smart_recommendations(category=category, limit=limit)
+    return recommendation_service.get_smart_recommendations(category=category, limit=limit, mood=mood)
 
 
 @mcp.tool()

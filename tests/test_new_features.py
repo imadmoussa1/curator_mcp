@@ -194,6 +194,76 @@ class TestNewCuratorFeatures(unittest.TestCase):
         self.assertEqual(updated["user_notes"], "Watched in IMAX with friends.")
         self.assertEqual(updated["date_watched"], "2026-09-09")
 
+    @patch.object(BookService, "stream_all")
+    @patch.object(MediaService, "stream_all")
+    def test_smart_recommendations_ai_weighted(self, mock_media_all, mock_books_all):
+        mock_books_all.return_value = [
+            {"id": "b1", "title": "Dune", "author": "Frank Herbert", "user_rating": 5, "date_read": "2026-01-01"},
+            {"id": "b2", "title": "Already Read", "author": "Author X", "user_rating": 4, "date_read": "2026-02-01"}
+        ]
+        mock_media_all.return_value = [
+            {"id": "m1", "title": "Blade Runner 2049", "media_type": "movie", "status": "watched", "user_rating": 10, "genres": ["Sci-Fi", "Drama"], "year": 2017},
+            {"id": "m2", "title": "Arrival", "media_type": "movie", "status": "watched", "user_rating": 9, "genres": ["Sci-Fi"], "year": 2016}
+        ]
+
+        mock_tmdb = MagicMock()
+        mock_tmdb.find_similar.return_value = {
+            "status": "success",
+            "recommendations": [
+                {
+                    "title": "Interstellar",
+                    "media_type": "movie",
+                    "genres": ["Sci-Fi", "Drama"],
+                    "vote_average": 8.7,
+                    "release_date": "2014-11-05"
+                },
+                {
+                    "title": "Blade Runner 2049",  # Should be deduplicated!
+                    "media_type": "movie",
+                    "genres": ["Sci-Fi"],
+                    "vote_average": 8.0
+                }
+            ]
+        }
+
+        mock_books_client = MagicMock()
+        mock_books_client.find_similar.return_value = {
+            "status": "success",
+            "recommendations": [
+                {
+                    "title": "Foundation",
+                    "author": "Isaac Asimov",
+                    "average_rating": 4.5
+                }
+            ]
+        }
+
+        service = RecommendationService(
+            book_service=BookService(),
+            media_service=MediaService(),
+            books_client=mock_books_client,
+            tmdb_client=mock_tmdb
+        )
+
+        res = service.get_smart_recommendations(category="all", limit=5)
+        self.assertEqual(res["status"], "success")
+
+        # Media checks
+        media_recs = res["media_recommendations"]
+        self.assertEqual(len(media_recs), 1)
+        self.assertEqual(media_recs[0]["title"], "Interstellar")
+        self.assertEqual(media_recs[0]["inspired_by"], "Blade Runner 2049")
+        self.assertIn("affinity_match_score", media_recs[0])
+        self.assertIn("why_you_will_love_this", media_recs[0])
+        self.assertIn("Because you rated 'Blade Runner 2049' 10/10", media_recs[0]["why_you_will_love_this"])
+
+        # Book checks
+        book_recs = res["book_recommendations"]
+        self.assertEqual(len(book_recs), 1)
+        self.assertEqual(book_recs[0]["title"], "Foundation")
+        self.assertIn("affinity_match_score", book_recs[0])
+        self.assertIn("why_you_will_love_this", book_recs[0])
+
 
 if __name__ == "__main__":
     unittest.main()
