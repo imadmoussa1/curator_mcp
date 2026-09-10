@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![FastMCP](https://img.shields.io/badge/MCP-FastMCP-brightgreen.svg)](https://github.com/jlowin/fastmcp)
 [![Google Cloud Firestore](https://img.shields.io/badge/Database-Firestore-orange.svg)](https://cloud.google.com/firestore)
-[![Tests: 36 Passing](https://img.shields.io/badge/tests-36%20passing-success.svg)](#-testing--quality-assurance)
+[![Tests: 45 Passing](https://img.shields.io/badge/tests-45%20passing-success.svg)](#-testing--quality-assurance)
 
 A production-grade **Model Context Protocol (MCP)** server and automated data ingestion pipeline that transforms **Google Cloud Firestore** into your private, intelligent entertainment memory, literature companion, knowledge vault, fine dining guide, and connoisseur taste curator.
 

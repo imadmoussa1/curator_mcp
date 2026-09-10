@@ -1,30 +1,83 @@
 """
-Domain service managing luxury, artisanal, and sensory items:
-Tea, Coffee, Whiskey, Gin, Wine, Chocolate, Perfume, and Watches.
-Stored in the Firestore 'sensory_vault' collection.
+Sensory Vault Facade & Coordinator:
+Provides a unified interface over individual connoisseur domain services:
+WhiskeyService, WineService, CoffeeService, TeaService, GinService,
+ChocolateService, PerfumeService, and WatchService.
 """
 
-from datetime import datetime, timezone
-import uuid
-import re
 from typing import Optional, List, Dict, Any
 from collections import Counter
 
-from models import SensoryItemModel, SensoryCategory, SensoryStatus
 from services.base_repository import BaseFirestoreRepository
+from services.connoisseur import (
+    BaseConnoisseurService,
+    WhiskeyService,
+    WineService,
+    CoffeeService,
+    TeaService,
+    GinService,
+    ChocolateService,
+    PerfumeService,
+    WatchService,
+)
 
 
 class SensoryService(BaseFirestoreRepository):
     """
-    Business logic and persistence layer for sensory goods and luxury timepieces.
+    Facade and service coordinator over specialized connoisseur domain services.
+    Adheres to the Single Responsibility Principle by delegating category-specific
+    operations to dedicated domain service classes.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        whiskey_service: Optional[WhiskeyService] = None,
+        wine_service: Optional[WineService] = None,
+        coffee_service: Optional[CoffeeService] = None,
+        tea_service: Optional[TeaService] = None,
+        gin_service: Optional[GinService] = None,
+        chocolate_service: Optional[ChocolateService] = None,
+        perfume_service: Optional[PerfumeService] = None,
+        watch_service: Optional[WatchService] = None,
+    ):
         super().__init__("sensory_vault")
+        self.whiskey = whiskey_service or WhiskeyService(repository=self)
+        self.wine = wine_service or WineService(repository=self)
+        self.coffee = coffee_service or CoffeeService(repository=self)
+        self.tea = tea_service or TeaService(repository=self)
+        self.gin = gin_service or GinService(repository=self)
+        self.chocolate = chocolate_service or ChocolateService(repository=self)
+        self.perfume = perfume_service or PerfumeService(repository=self)
+        self.watch = watch_service or WatchService(repository=self)
 
-    def _generate_sensory_id(self, category: str, maker: str, name: str) -> str:
-        slug = re.sub(r"[^a-zA-Z0-9]+", "_", f"{category}_{maker}_{name}".lower()).strip("_")
-        return f"sens_{slug[:28]}_{uuid.uuid4().hex[:6]}"
+        self._registry: Dict[str, BaseConnoisseurService] = {
+            "whiskey": self.whiskey,
+            "wine": self.wine,
+            "coffee": self.coffee,
+            "tea": self.tea,
+            "gin": self.gin,
+            "chocolate": self.chocolate,
+            "perfume": self.perfume,
+            "watch": self.watch,
+        }
+
+    def _get_service_for_category(self, category: str) -> BaseConnoisseurService:
+        """Resolve specialized service from category name or synonym."""
+        c_clean = category.strip().lower()
+        synonyms = {
+            "whisky": "whiskey",
+            "scotch": "whiskey",
+            "bourbon": "whiskey",
+            "fragrance": "perfume",
+            "cologne": "perfume",
+            "scent": "perfume",
+            "watches": "watch",
+            "timepiece": "watch",
+            "cacao": "chocolate",
+            "choc": "chocolate",
+        }
+        normalized = synonyms.get(c_clean, c_clean)
+        return self._registry.get(normalized, self.whiskey)
 
     def log_item(
         self,
@@ -44,40 +97,24 @@ class SensoryService(BaseFirestoreRepository):
         item_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Log or upsert a sensory item (tea, coffee, whiskey, gin, wine, chocolate, perfume, watch).
+        Delegate logging to the appropriate specialized domain service class.
         """
-        doc_id = item_id.strip() if item_id else self._generate_sensory_id(category, maker_or_brand, name)
-        if not date_experienced:
-            date_experienced = datetime.now().strftime("%Y-%m-%d")
-
-        rating_val = None
-        if user_rating is not None:
-            rating_val = round(max(1.0, min(10.0, float(user_rating))), 1)
-
-        item = SensoryItemModel(
-            id=doc_id,
-            category=category,
-            name=name.strip(),
-            maker_or_brand=maker_or_brand.strip(),
-            origin_or_region=origin_or_region.strip() if origin_or_region else None,
-            vintage_or_year=str(vintage_or_year).strip() if vintage_or_year else None,
+        sub_service = self._get_service_for_category(category)
+        return sub_service.log(
+            name=name,
+            maker_or_brand=maker_or_brand,
+            origin_or_region=origin_or_region,
+            vintage_or_year=vintage_or_year,
             status=status,
-            user_rating=rating_val,
-            flavor_or_scent_notes=[n.strip().lower() for n in (flavor_or_scent_notes or []) if n.strip()],
-            specs=specs or {},
-            review=review or "",
-            personal_notes=personal_notes or "",
+            user_rating=user_rating,
+            flavor_or_scent_notes=flavor_or_scent_notes,
+            specs=specs,
+            review=review,
+            personal_notes=personal_notes,
             price_tier=price_tier,
             date_experienced=date_experienced,
-            updated_at=datetime.now(timezone.utc),
+            item_id=item_id,
         )
-
-        self.set(doc_id, item.to_firestore_dict())
-        return {
-            "status": "success",
-            "message": f"Successfully logged {item.category.capitalize()} '{item.name}' by {item.maker_or_brand} to sensory vault.",
-            "item": item.to_firestore_dict()
-        }
 
     def update_item(
         self,
@@ -90,35 +127,23 @@ class SensoryService(BaseFirestoreRepository):
         specs: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Update tasting notes, ratings, or status on an existing sensory item.
+        Update an item by finding its category and delegating to the specialized domain service.
         """
         existing = self.get_by_id(item_id)
         if not existing:
             return {"status": "error", "message": f"Item '{item_id}' not found in sensory vault."}
 
-        updates: Dict[str, Any] = {"updated_at": datetime.now(timezone.utc)}
-        if user_rating is not None:
-            updates["user_rating"] = round(max(1.0, min(10.0, float(user_rating))), 1)
-        if status is not None:
-            updates["status"] = status.strip().lower()
-        if review is not None:
-            updates["review"] = review.strip()
-        if personal_notes is not None:
-            updates["personal_notes"] = personal_notes.strip()
-        if flavor_or_scent_notes is not None:
-            updates["flavor_or_scent_notes"] = [n.strip().lower() for n in flavor_or_scent_notes if n.strip()]
-        if specs is not None:
-            merged_specs = existing.get("specs", {})
-            merged_specs.update(specs)
-            updates["specs"] = merged_specs
-
-        self.set(item_id, updates, merge=True)
-        return {
-            "status": "success",
-            "message": f"Updated sensory item '{item_id}'.",
-            "item_id": item_id,
-            "updated_fields": list(updates.keys())
-        }
+        category = existing.get("category", "whiskey")
+        sub_service = self._get_service_for_category(category)
+        return sub_service.update(
+            item_id=item_id,
+            user_rating=user_rating,
+            status=status,
+            review=review,
+            personal_notes=personal_notes,
+            flavor_or_scent_notes=flavor_or_scent_notes,
+            specs=specs,
+        )
 
     def search(
         self,
@@ -130,17 +155,25 @@ class SensoryService(BaseFirestoreRepository):
         limit: int = 20,
     ) -> List[Dict[str, Any]]:
         """
-        Search and filter sensory items by query keywords, category, status, rating, or sensory notes.
+        Search sensory vault items. If category is provided, delegates to that specific domain service.
+        Otherwise, aggregates search results across all items.
         """
+        if category:
+            sub_service = self._get_service_for_category(category)
+            return sub_service.search(
+                query=query,
+                status=status,
+                min_rating=min_rating,
+                tag=tag,
+                limit=limit,
+            )
+
         q_norm = query.lower().strip()
         tag_norm = tag.lower().strip() if tag else None
-        cat_norm = category.lower().strip() if category else None
         status_norm = status.lower().strip() if status else None
 
         results = []
         for item in self.stream_all():
-            if cat_norm and item.get("category") != cat_norm:
-                continue
             if status_norm and item.get("status") != status_norm:
                 continue
             if min_rating and (item.get("user_rating") or 0) < min_rating:
@@ -168,7 +201,7 @@ class SensoryService(BaseFirestoreRepository):
 
     def get_stats(self) -> Dict[str, Any]:
         """
-        Generate macro analytics across the sensory vault.
+        Generate macro analytics across the entire sensory vault.
         """
         items = self.stream_all()
         by_category = Counter()
