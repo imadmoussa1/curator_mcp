@@ -196,73 +196,45 @@ class TestNewCuratorFeatures(unittest.TestCase):
 
     @patch.object(BookService, "stream_all")
     @patch.object(MediaService, "stream_all")
-    def test_smart_recommendations_ai_weighted(self, mock_media_all, mock_books_all):
+    def test_agent_recommendation_brief_and_vetting(self, mock_media_all, mock_books_all):
         mock_books_all.return_value = [
-            {"id": "b1", "title": "Dune", "author": "Frank Herbert", "user_rating": 5, "date_read": "2026-01-01"},
-            {"id": "b2", "title": "Already Read", "author": "Author X", "user_rating": 4, "date_read": "2026-02-01"}
+            {"id": "b1", "title": "Dune", "author": "Frank Herbert", "user_rating": 5, "notes_and_reviews": "Masterpiece worldbuilding."},
+            {"id": "b2", "title": "Already Read", "author": "Author X", "user_rating": 2, "notes_and_reviews": "Boring prose."}
         ]
         mock_media_all.return_value = [
             {"id": "m1", "title": "Blade Runner 2049", "media_type": "movie", "status": "watched", "user_rating": 10, "genres": ["Sci-Fi", "Drama"], "year": 2017},
             {"id": "m2", "title": "Arrival", "media_type": "movie", "status": "watched", "user_rating": 9, "genres": ["Sci-Fi"], "year": 2016}
         ]
 
-        mock_tmdb = MagicMock()
-        mock_tmdb.find_similar.return_value = {
-            "status": "success",
-            "recommendations": [
-                {
-                    "title": "Interstellar",
-                    "media_type": "movie",
-                    "genres": ["Sci-Fi", "Drama"],
-                    "vote_average": 8.7,
-                    "release_date": "2014-11-05"
-                },
-                {
-                    "title": "Blade Runner 2049",  # Should be deduplicated!
-                    "media_type": "movie",
-                    "genres": ["Sci-Fi"],
-                    "vote_average": 8.0
-                }
-            ]
-        }
-
-        mock_books_client = MagicMock()
-        mock_books_client.find_similar.return_value = {
-            "status": "success",
-            "recommendations": [
-                {
-                    "title": "Foundation",
-                    "author": "Isaac Asimov",
-                    "average_rating": 4.5
-                }
-            ]
-        }
-
         service = RecommendationService(
             book_service=BookService(),
             media_service=MediaService(),
-            books_client=mock_books_client,
-            tmdb_client=mock_tmdb
         )
 
-        res = service.get_smart_recommendations(category="all", limit=5)
-        self.assertEqual(res["status"], "success")
+        brief = service.get_agent_recommendation_brief(domain="movies", mood_or_intent="atmospheric")
+        self.assertEqual(brief["status"], "success")
+        agent_data = brief["briefing_for_ai_agent"]
+        self.assertIn("user_taste_dna", agent_data)
+        self.assertIn("negative_exclusion_catalog", agent_data)
+        self.assertIn("suggested_web_search_directives", agent_data)
+        anchors = agent_data["user_taste_dna"]["top_rated_anchors"]
+        self.assertTrue(any(a["title"] == "Blade Runner 2049" for a in anchors))
 
-        # Media checks
-        media_recs = res["media_recommendations"]
-        self.assertEqual(len(media_recs), 1)
-        self.assertEqual(media_recs[0]["title"], "Interstellar")
-        self.assertEqual(media_recs[0]["inspired_by"], "Blade Runner 2049")
-        self.assertIn("affinity_match_score", media_recs[0])
-        self.assertIn("why_you_will_love_this", media_recs[0])
-        self.assertIn("Because you rated 'Blade Runner 2049' 10/10", media_recs[0]["why_you_will_love_this"])
+        # Test candidate vetting: duplicate candidate flagged
+        dup_vet = service.vet_recommendation_candidate(domain="movies", title_or_name="Blade Runner 2049")
+        self.assertFalse(dup_vet["is_clean_recommendation"])
+        self.assertEqual(dup_vet["status"], "collision_detected")
 
-        # Book checks
-        book_recs = res["book_recommendations"]
-        self.assertEqual(len(book_recs), 1)
-        self.assertEqual(book_recs[0]["title"], "Foundation")
-        self.assertIn("affinity_match_score", book_recs[0])
-        self.assertIn("why_you_will_love_this", book_recs[0])
+        # Test candidate vetting: fresh candidate approved
+        fresh_vet = service.vet_recommendation_candidate(
+            domain="movies",
+            title_or_name="Children of Men",
+            maker_or_creator="Alfonso Cuaron",
+            attributes=["Sci-Fi", "Dystopian"]
+        )
+        self.assertTrue(fresh_vet["is_clean_recommendation"])
+        self.assertEqual(fresh_vet["status"], "approved_clean_discovery")
+        self.assertIn("taste_affinity_score", fresh_vet)
 
 
 if __name__ == "__main__":

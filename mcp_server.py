@@ -270,25 +270,6 @@ def get_entertainment_stats() -> Dict[str, Any]:
 
 
 @mcp.tool()
-def get_smart_recommendations(category: str = "all", limit: int = 5, mood: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Generate deeply personalized AI recommendations synthesized from what you've actually watched and read.
-    Ranks items using:
-    - Your 10/10 and 9/10 masterpieces as seed anchors
-    - Your proven taste affinity across directors, authors, and genres
-    - Recency of what you finished
-    - Dynamic match percentage (e.g. '96% Affinity')
-    - 'why_you_will_love_this' contextual reasoning explaining the exact connection to your past ratings
-    - Strict deduplication (guarantees you won't be recommended what you've already consumed or queued)
-    Args:
-        category: 'movies', 'tv', 'books', or 'all'
-        limit: Max recommendations per category
-        mood: Optional mood or vibe constraint (e.g. 'dark', 'philosophical', 'uplifting')
-    """
-    return recommendation_service.get_smart_recommendations(category=category, limit=limit, mood=mood)
-
-
-@mcp.tool()
 def get_agent_recommendation_brief(
     domain: str,
     mood_or_intent: Optional[str] = None,
@@ -948,27 +929,6 @@ def get_sensory_taste_profile() -> Dict[str, Any]:
 
 
 @mcp.tool()
-def get_sensory_recommendations(
-    category: Optional[str] = None,
-    mood: Optional[str] = None,
-    limit: int = 5,
-) -> Dict[str, Any]:
-    """
-    Generate intelligent luxury, spirits, coffee, tea, chocolate, perfume, or watch recommendations
-    synthesized from your highest rated flavor notes, proven makers, and olfactory accords.
-    Args:
-        category: 'tea', 'coffee', 'whiskey', 'gin', 'wine', 'chocolate', 'perfume', or 'watch'
-        mood: Optional vibe or flavor preference (e.g. 'peaty', 'floral', 'autumn', 'vintage')
-        limit: Max recommendations
-    """
-    return recommendation_service.get_sensory_recommendations(
-        category=category,
-        mood=mood,
-        limit=limit,
-    )
-
-
-@mcp.tool()
 def search_open_product_catalog(
     category: str,
     query: str,
@@ -1097,28 +1057,10 @@ def get_dining_stats() -> Dict[str, Any]:
     return restaurant_service.get_stats()
 
 
-@mcp.tool()
-def get_restaurant_recommendations(
-    city: Optional[str] = None,
-    vibe: Optional[str] = None,
-    cuisine: Optional[str] = None,
-    limit: int = 5,
-) -> Dict[str, Any]:
-    """
-    Generate personalized dining recommendations in target cities (e.g. Tokyo, Paris, New York, London)
-    synthesized from your favorite dining ambiance tags, favorite cuisines, and high-rating history.
-    """
-    return recommendation_service.get_restaurant_recommendations(
-        city=city,
-        vibe=vibe,
-        cuisine=cuisine,
-        limit=limit,
-    )
-
-
 # ============================================================================
 # 8. MULTIMODAL SENSORY & CULTURAL PAIRINGS
 # ============================================================================
+
 
 @mcp.tool()
 def get_aesthetic_pairing(

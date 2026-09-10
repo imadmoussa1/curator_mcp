@@ -297,17 +297,19 @@ class TestSensoryAndRestaurants(unittest.TestCase):
         self.assertIn("peat", profile["top_flavor_and_scent_accords"])
         self.assertIn("Lagavulin", profile["favorite_makers_or_distilleries"])
 
-        # Sensory recommendation
-        whiskey_recs = rec_service.get_sensory_recommendations(category="whiskey", limit=3)
-        self.assertEqual(whiskey_recs["status"], "success")
-        self.assertEqual(whiskey_recs["category"], "whiskey")
-        self.assertGreater(len(whiskey_recs["recommendations"]), 0)
+        # Sensory agent brief
+        whiskey_brief = rec_service.get_agent_recommendation_brief(domain="whiskey", mood_or_intent="peaty")
+        self.assertEqual(whiskey_brief["status"], "success")
+        self.assertEqual(whiskey_brief["domain"], "whiskey")
+        whiskey_dna = whiskey_brief["briefing_for_ai_agent"]["user_taste_dna"]
+        self.assertGreater(len(whiskey_dna["top_rated_anchors"]), 0)
 
-        # Restaurant recommendation
-        dining_recs = rec_service.get_restaurant_recommendations(city="Paris", limit=2)
-        self.assertEqual(dining_recs["status"], "success")
-        self.assertEqual(dining_recs["city"], "Paris")
-        self.assertGreater(len(dining_recs["recommendations"]), 0)
+        # Restaurant agent brief
+        dining_brief = rec_service.get_agent_recommendation_brief(domain="restaurants", target_location="Paris")
+        self.assertEqual(dining_brief["status"], "success")
+        self.assertEqual(dining_brief["domain"], "restaurants")
+        dining_dna = dining_brief["briefing_for_ai_agent"]["user_taste_dna"]
+        self.assertGreater(len(dining_dna["top_rated_anchors"]), 0)
 
     @patch("requests.get")
     def test_catalog_client_mock(self, mock_get):

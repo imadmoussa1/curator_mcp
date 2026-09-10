@@ -220,7 +220,6 @@ The server registers **45 specialized tools**, **4 native context resources**, a
 | `vet_recommendation_candidate` | `domain`, `title_or_name`, `maker_or_creator`, `attributes` | **Call before presenting to user**. Checks for library/wishlist collisions, calculates taste affinity score, and returns personalization hooks. |
 | `get_user_taste_profile` | *none* | Aggregates favorite genres, top directors, authors, and 5★/10★ items. |
 | `get_entertainment_stats` | *none* | Macro metrics across books, media, quotes, podcasts, sensory vault, and restaurants. |
-| `get_smart_recommendations` | `category`, `limit`, `mood` | Local heuristic recommender querying similar items and excluding consumed/queued titles. |
 | `curate_for_tonight` | `max_runtime_mins`, `genre`, `min_imdb_rating`, `media_type`, `count` | Smart evening picker that filters watchlist by runtime, mood, and ratings with match reasons. |
 | `generate_cultural_wrapped` | `year` | Comprehensive annual cultural retrospective with metrics and synthesized "Cultural Archetype". |
 
@@ -276,7 +275,6 @@ The server registers **45 specialized tools**, **4 native context resources**, a
 | `update_sensory_item` | `item_id`, `user_rating`, `status`, `review`, `personal_notes`, `flavor_or_scent_notes`, `specs` | Update tasting notes, ratings, or mark wishlist item as sampled/owned. |
 | `search_sensory_vault` | `query`, `category`, `status`, `min_rating`, `tag`, `limit` | Search personal vault by keyword, category, status, rating, or flavor/scent tag. |
 | `get_sensory_taste_profile` | *none* | Aggregated flavor profile, top accords, and favorite distillers, roasters, or perfumers. |
-| `get_sensory_recommendations` | `category`, `mood`, `limit` | AI taste recommendations matching your highest-rated notes and artisan makers. |
 | `search_open_product_catalog` | `category`, `query`, `limit` | Free search across Open Food Facts (wines, teas, coffee, chocolate) and Whisky Hunter. |
 
 ### 7. Fine Dining & Restaurant Journal
@@ -286,7 +284,6 @@ The server registers **45 specialized tools**, **4 native context resources**, a
 | `update_restaurant` | `restaurant_id`, `status`, `user_rating`, `standout_dishes`, `notes_and_review`, `vibe_tags`, `date_visited`, `url_or_reservation` | Update food reviews, signature dishes, or convert wishlist to visited. |
 | `search_restaurants` | `query`, `city`, `cuisine`, `status`, `vibe`, `min_rating`, `limit` | Query dining history and wishlists by city, cuisine, vibe tag, or rating. |
 | `get_dining_stats` | *none* | Summary of places visited, cities explored, top cuisines, and Michelin star breakdown. |
-| `get_restaurant_recommendations` | `city`, `vibe`, `cuisine`, `limit` | Curated dining recommendations in top food capitals matching your preferred vibes. |
 
 ### 8. Multimodal Sensory & Cultural Pairings
 | Tool Name | Parameters | Description |
@@ -460,12 +457,12 @@ Once Curator MCP is connected to **Claude Desktop**, you can interact naturally 
 - *"Is 'Interstellar' streaming on Netflix, Prime, or Max in the UK?"*
   - 👉 **Tool called**: `get_streaming_providers(title='Interstellar', country='GB')`
 
-### 4. 🧠 Smart AI Recommendations (Watch History & Taste-Weighted)
-- *"Give me smart recommendations based on my all-time favorite movies and books that I haven't seen or read yet."*
-  - 👉 **Tool called**: `get_smart_recommendations(category='all', limit=3)`
-  - 🤖 **Returns**: Deduplicated picks with **`affinity_match_score`** (e.g. `96% Match`) and **`why_you_will_love_this`** explanation linking directly back to your 10/10 and 5★ ratings.
-- *"Recommend movies like what I usually enjoy, but with a dark or psychological thriller mood."*
-  - 👉 **Tool called**: `get_smart_recommendations(category='movies', limit=4, mood='dark thriller')`
+### 4. 🧠 AI-Agent Empowered Recommendations & Taste Vetting
+- *"Give me bespoke recommendations based on my all-time favorite movies and books that I haven't seen or read yet."*
+  - 📋 **Step 1 (Taste Briefing)**: Agent calls `get_agent_recommendation_brief(domain='movies', mood_or_intent='atmospheric masterpiece')` to receive your 10/10 anchors, negative exclusions, and web search directives.
+  - 🌐 **Step 2 (Live Discovery)**: Agent executes live web searches targeting your proven affinities.
+  - 🛡️ **Step 3 (Vetting)**: Agent calls `vet_recommendation_candidate(domain='movies', title_or_name='Children of Men', maker_or_creator='Alfonso Cuarón')` to guarantee 0% collision with your collection and compute affinity match percentage.
+  - 🤖 **Step 4 (Delivery)**: Agent presents clean, personalized recommendations with direct reasoning tethered to your 10/10 and 5★ ratings.
 - *"Find books similar in themes and style to 'Thinking, Fast and Slow'."*
   - 👉 **Tool called**: `find_similar_books_online(title='Thinking, Fast and Slow')`
 - *"Find movies similar to 'Blade Runner 2049'."*
@@ -531,7 +528,7 @@ Once Curator MCP is connected to **Claude Desktop**, you can interact naturally 
 - *"What are my top sensory flavor accords and favorite distillers across my collection?"*
   - 👉 **Tool called**: `get_sensory_taste_profile`
 - *"Give me whiskey recommendations based on the peat and smoke flavor notes I love."*
-  - 👉 **Tool called**: `get_sensory_recommendations(category='whiskey', limit=3)`
+  - 👉 **Workflow**: AI agent calls `get_agent_recommendation_brief(domain='whiskey', mood_or_intent='peat and smoke')`, explores top independent distillers, and confirms each pick via `vet_recommendation_candidate`.
 - *"Search open databases for artisanal chocolate from Valrhona."*
   - 👉 **Tool called**: `search_open_product_catalog(category='chocolate', query='Valrhona')`
 
@@ -543,7 +540,7 @@ Once Curator MCP is connected to **Claude Desktop**, you can interact naturally 
 - *"What restaurants have I visited in Paris or New York?"*
   - 👉 **Tool called**: `search_restaurants(city='Paris')`
 - *"Recommend great places to dine in Tokyo or London matching my love for counter seating and natural wine."*
-  - 👉 **Tool called**: `get_restaurant_recommendations(city='Tokyo', vibe='counter')`
+  - 👉 **Workflow**: AI agent calls `get_agent_recommendation_brief(domain='restaurants', target_location='Tokyo', mood_or_intent='counter seating and natural wine')`, searches recent restaurant openings, and screens against visited places.
 - *"Give me a summary of my dining statistics: cities explored, top cuisines, and Michelin breakdown."*
   - 👉 **Tool called**: `get_dining_stats`
 
