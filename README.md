@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![FastMCP](https://img.shields.io/badge/MCP-FastMCP-brightgreen.svg)](https://github.com/jlowin/fastmcp)
 [![Google Cloud Firestore](https://img.shields.io/badge/Database-Firestore-orange.svg)](https://cloud.google.com/firestore)
-[![Tests: 53 Passing](https://img.shields.io/badge/tests-53%20passing-success.svg)](#-testing--quality-assurance)
+[![Tests: 60 Passing](https://img.shields.io/badge/tests-60%20passing-success.svg)](#-testing--quality-assurance)
 
 A production-grade **Model Context Protocol (MCP)** server and automated data ingestion pipeline that transforms **Google Cloud Firestore** into your private, intelligent entertainment memory, literature companion, knowledge vault, fine dining guide, and connoisseur taste curator.
 
@@ -15,15 +15,16 @@ Connects natively to **Gemini**, **Claude Desktop**, **Antigravity IDE**, and ot
 4. **Podcasts**: Queue management, listening logs, guest tracking, key takeaways, and zero-key Apple Podcasts discovery.
 5. **Sensory Vault**: Connoisseur tasting logs for **Tea, Whiskey, Coffee, Gin, Wine, Chocolate, Perfume, and Watches** with flavor wheel accords and domain specs.
 6. **Fine Dining & Restaurants**: Gastronomy journal, city guides, Michelin distinctions, signature dishes, and reservation wishlists.
-7. **Taste Profiling & Smart Recommendations**: Synthesizes ratings across books, films, sensory goods, and restaurants to recommend new gems while strictly filtering out items already consumed or queued.
+7. **AI-Agent Empowered Recommendations**: Supplies the calling LLM agent with deep personal Taste DNA, strict Negative Exclusion Catalogs, real-time web search directives, and candidate vetting for zero-collision discoveries.
 8. **Multimodal Sensory Pairings**: Cross-domain aesthetic pairings bridging books and films with beverages, ambient fragrances, chocolates, and sonic atmospheres.
-9. **Claude Desktop Native Prompts & Resources**: Zero-click background context (`curator://context/...`) and 1-click `/` slash commands (`/daily-briefing`, `/tasting-session`, `/weekend-curation`).
+9. **Claude Desktop Native Prompts & Resources**: Zero-click background context (`curator://context/...`) and 1-click `/` slash commands (`/daily-briefing`, `/tasting-session`, `/weekend-curation`, `/smart-recommendation-consultation`).
 
 ---
 
 ## 🏛️ Clean Architecture & Design
 
 `curator-mcp` is architected using **Domain-Driven Design (DDD)** and **Clean Architecture** principles. Rather than cramming business logic into a single file, the system is organized into modular, testable, and loosely-coupled components:
+
 
 ```mermaid
 graph TD
@@ -198,7 +199,7 @@ python -m importers.imdb_importer --watchlist path/to/watchlist.csv
 
 ## 🛠️ Model Context Protocol (MCP) Tools
 
-The server registers **43 specialized tools**, **3 native context resources**, and **3 interactive prompts** categorized across eight domains:
+The server registers **45 specialized tools**, **4 native context resources**, and **4 interactive prompts** categorized across eight domains:
 
 ### 0. Claude Desktop Context Resources & 1-Click Prompts
 | Feature Type | Identifier / URI | Description |
@@ -206,18 +207,23 @@ The server registers **43 specialized tools**, **3 native context resources**, a
 | **Resource** | `curator://context/taste_profile` | Live background context: user's top genres, directors, authors, flavor accords, and favorite cuisines. |
 | **Resource** | `curator://context/active_queues` | Live background context: currently-reading books, movie watchlist, and podcast queue. |
 | **Resource** | `curator://context/daily_digest` | Morning briefing: Quote of the Day, reading progress, and vault summary metrics. |
+| **Resource** | `curator://context/taste_dna_dossier` | Machine-readable Taste DNA dossier (Cultural Archetype, top creators, sensory accords). |
 | **Prompt** | `/daily-briefing` | 1-click morning briefing prompt synthesizing thoughts for the day and evening cultural picks. |
 | **Prompt** | `/tasting-session` | Master Sommelier / Barista / Perfumer interactive tasting interview to evaluate and log items. |
 | **Prompt** | `/weekend-curation` | Complete curated weekend plan (film pick + wine/tea pairing + book reading + dinner). |
+| **Prompt** | `/smart-recommendation-consultation` | AI agent workflow: loads user brief, runs web searches, vets candidates, and delivers zero-collision picks. |
 
-### 1. Taste Profile, Curate My Night & Annual Wrapped
+### 1. AI-Agent Empowered Recommendations & Taste Intelligence
 | Tool Name | Parameters | Description |
 |---|---|---|
+| `get_agent_recommendation_brief` | `domain`, `mood_or_intent`, `target_location` | **Call this FIRST for recommendations**. Gives the AI agent the user's complete Taste DNA, Negative Exclusion Catalog, and high-signal web search directives to find fresh gems. |
+| `vet_recommendation_candidate` | `domain`, `title_or_name`, `maker_or_creator`, `attributes` | **Call before presenting to user**. Checks for library/wishlist collisions, calculates taste affinity score, and returns personalization hooks. |
 | `get_user_taste_profile` | *none* | Aggregates favorite genres, top directors, authors, and 5★/10★ items. |
 | `get_entertainment_stats` | *none* | Macro metrics across books, media, quotes, podcasts, sensory vault, and restaurants. |
-| `get_smart_recommendations` | `category`, `limit`, `mood` | Intelligent AI recommender that queries similar items and excludes consumed/queued titles. |
+| `get_smart_recommendations` | `category`, `limit`, `mood` | Local heuristic recommender querying similar items and excluding consumed/queued titles. |
 | `curate_for_tonight` | `max_runtime_mins`, `genre`, `min_imdb_rating`, `media_type`, `count` | Smart evening picker that filters watchlist by runtime, mood, and ratings with match reasons. |
 | `generate_cultural_wrapped` | `year` | Comprehensive annual cultural retrospective with metrics and synthesized "Cultural Archetype". |
+
 
 ### 2. Books Management & Discovery (Goodreads Standard)
 | Tool Name | Parameters | Description |

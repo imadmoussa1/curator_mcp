@@ -138,9 +138,48 @@ def get_daily_digest_context() -> str:
     return "\n".join(lines)
 
 
+@mcp.resource("curator://context/taste_dna_dossier")
+def get_taste_dna_dossier() -> str:
+    """
+    Live background context resource exposing the comprehensive Taste DNA dossier
+    of the user across literature, cinema, culinary, and artisanal categories.
+    """
+    profile = recommendation_service.get_taste_profile()
+    sensory = recommendation_service.get_sensory_taste_profile() if hasattr(recommendation_service, "get_sensory_taste_profile") else {}
+    wrapped = recommendation_service.generate_cultural_wrapped()
+    lines = [
+        "# Curator MCP - User Taste DNA Dossier",
+        f"**Cultural Archetype**: {wrapped.get('cultural_archetype', {}).get('title', 'The Polymath')} — {wrapped.get('cultural_archetype', {}).get('summary', '')}",
+        f"**Top Literary Authors**: {', '.join(profile.get('taste_summary', {}).get('top_authors', [])[:5])}",
+        f"**Top Cinematic Directors**: {', '.join(profile.get('taste_summary', {}).get('top_directors', [])[:5])}",
+        f"**Top Film & Show Genres**: {', '.join(profile.get('taste_summary', {}).get('top_genres', [])[:5])}",
+        f"**Top Sensory Accords**: {', '.join(sensory.get('top_flavor_and_scent_accords', [])[:6])}",
+        f"**Top Artisans & Distilleries**: {', '.join(sensory.get('favorite_makers_or_distilleries', [])[:5])}",
+    ]
+    return "\n".join(lines)
+
+
 # ============================================================================
 # 0.5 CLAUDE DESKTOP 1-CLICK PROMPTS (@mcp.prompt)
 # ============================================================================
+
+@mcp.prompt("smart_recommendation_consultation")
+def smart_recommendation_consultation(domain: str = "movies", mood_or_craving: str = "") -> str:
+    """
+    Orchestrate an elite, internet-powered recommendation session.
+    Instructs the AI agent to retrieve the user's taste brief, run live web searches
+    for fresh/hidden gems, vet candidates, and present a curated choice.
+    """
+    craving_str = f" for '{mood_or_craving}'" if mood_or_craving else ""
+    return (
+        f"The user wants a smart, highly personalized recommendation in '{domain}'{craving_str}.\n"
+        "As an AI agent with internet search access, follow this elite curation workflow:\n"
+        "1. Call `get_agent_recommendation_brief(domain='{domain}', mood_or_intent='{mood_or_craving}')` to get their Taste DNA and strict Negative Exclusion Catalog.\n"
+        "2. Execute live internet searches using the suggested queries in the brief to discover fresh, acclaimed, or obscure candidates (e.g. 2024-2026 releases or hidden masterpieces).\n"
+        "3. For your top 1-2 discovered candidates, call `vet_recommendation_candidate(domain='{domain}', title_or_name=...)` to guarantee ZERO library collisions and get verified affinity scores.\n"
+        "4. Present the final curated recommendation with an evocative review and explicit connection to their past 10/10 favorites."
+    )
+
 
 @mcp.prompt("daily_briefing")
 def daily_briefing() -> str:
@@ -247,6 +286,55 @@ def get_smart_recommendations(category: str = "all", limit: int = 5, mood: Optio
         mood: Optional mood or vibe constraint (e.g. 'dark', 'philosophical', 'uplifting')
     """
     return recommendation_service.get_smart_recommendations(category=category, limit=limit, mood=mood)
+
+
+@mcp.tool()
+def get_agent_recommendation_brief(
+    domain: str,
+    mood_or_intent: Optional[str] = None,
+    target_location: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Call this tool FIRST when the user asks for recommendations.
+    Equips you (the AI agent) with the user's complete Taste DNA, items to strictly avoid
+    (Negative Exclusion Catalog), low-rated guardrails, and targeted web search strategies
+    to discover fresh, extraordinary recommendations using your web search tool.
+    Args:
+        domain: 'books', 'movies', 'tv', 'whiskey', 'coffee', 'tea', 'wine', 'gin', 'chocolate', 'perfume', 'watch', 'restaurants', 'podcasts'
+        mood_or_intent: Optional vibe, genre, or craving constraint (e.g. 'cerebral slow-burn sci-fi', 'peated sherry finish', 'funky natural wine counter')
+        target_location: City or region (crucial for restaurants, e.g. 'Tokyo', 'London', 'Paris', 'New York')
+    """
+    return recommendation_service.get_agent_recommendation_brief(
+        domain=domain,
+        mood_or_intent=mood_or_intent,
+        target_location=target_location
+    )
+
+
+@mcp.tool()
+def vet_recommendation_candidate(
+    domain: str,
+    title_or_name: str,
+    maker_or_creator: Optional[str] = None,
+    attributes: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """
+    Before presenting a candidate you found via web search to the user, call this tool
+    to verify it is NOT already in their library, collection, or wishlist (collision check),
+    and to receive calculated taste affinity scores and personalized connection hooks.
+    Args:
+        domain: 'books', 'movies', 'tv', 'whiskey', 'coffee', 'tea', 'wine', 'gin', 'chocolate', 'perfume', 'watch', 'restaurants', 'podcasts'
+        title_or_name: Title of book/film/podcast or name of restaurant/bottle/fragrance
+        maker_or_creator: Author, director, roaster, distillery, chef, or perfume house
+        attributes: List of flavor notes, genres, vibe tags, or stylistic attributes
+    """
+    return recommendation_service.vet_recommendation_candidate(
+        domain=domain,
+        title_or_name=title_or_name,
+        maker_or_creator=maker_or_creator,
+        attributes=attributes
+    )
+
 
 
 @mcp.tool()
