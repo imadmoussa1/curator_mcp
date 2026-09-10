@@ -28,6 +28,8 @@ class RecommendationService:
         tmdb_client: TMDBClient,
         quote_service: Optional[Any] = None,
         podcast_service: Optional[Any] = None,
+        sensory_service: Optional[Any] = None,
+        restaurant_service: Optional[Any] = None,
     ):
         self.book_service = book_service
         self.media_service = media_service
@@ -35,6 +37,8 @@ class RecommendationService:
         self.tmdb_client = tmdb_client
         self.quote_service = quote_service
         self.podcast_service = podcast_service
+        self.sensory_service = sensory_service
+        self.restaurant_service = restaurant_service
 
     def get_taste_profile(self) -> Dict[str, Any]:
         """
@@ -362,4 +366,266 @@ class RecommendationService:
                     for m in media_in_year[:5] if m.get("user_rating", 0) >= 8
                 ]
             }
+        }
+
+    # ========================================================================
+    # SENSORY & CONNOISSEUR RECOMMENDATIONS
+    # ========================================================================
+
+    def get_sensory_taste_profile(self) -> Dict[str, Any]:
+        """
+        Aggregate connoisseur flavor profiles, olfactory accords, and luxury preferences.
+        """
+        if not self.sensory_service:
+            return {"status": "error", "message": "SensoryService not configured."}
+
+        items = self.sensory_service.stream_all()
+        top_items = [it for it in items if (it.get("user_rating") or 0) >= 8.0]
+        notes_counter = Counter()
+        makers_counter = Counter()
+        origins_counter = Counter()
+        category_breakdown = Counter()
+
+        for it in top_items:
+            category_breakdown[it.get("category", "unknown")] += 1
+            if it.get("maker_or_brand"):
+                makers_counter[it["maker_or_brand"]] += 1
+            if it.get("origin_or_region"):
+                origins_counter[it["origin_or_region"]] += 1
+            for note in it.get("flavor_or_scent_notes", []):
+                notes_counter[note.lower()] += 1
+
+        return {
+            "status": "success",
+            "total_items_in_vault": len(items),
+            "highly_rated_count": len(top_items),
+            "top_flavor_and_scent_accords": [n for n, _ in notes_counter.most_common(10)],
+            "favorite_makers_or_distilleries": [m for m, _ in makers_counter.most_common(6)],
+            "preferred_origins_and_regions": [o for o, _ in origins_counter.most_common(6)],
+            "categories_explored": dict(category_breakdown),
+            "highlight_masterpieces": [
+                {
+                    "name": it.get("name"),
+                    "maker": it.get("maker_or_brand"),
+                    "category": it.get("category"),
+                    "rating": f"{it.get('user_rating')}/10",
+                    "notes": it.get("flavor_or_scent_notes", []),
+                }
+                for it in top_items[:8]
+            ],
+        }
+
+    def get_sensory_recommendations(
+        self,
+        category: Optional[str] = None,
+        mood: Optional[str] = None,
+        limit: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Synthesize smart tasting and luxury recommendations based on user's highest rated flavor notes,
+        proven makers, and olfactory profiles.
+        """
+        if not self.sensory_service:
+            return {"status": "error", "message": "SensoryService not configured."}
+
+        items = self.sensory_service.stream_all()
+        cat_norm = category.lower().strip() if category else None
+
+        # Filter by category if specified
+        relevant_items = [it for it in items if not cat_norm or it.get("category") == cat_norm]
+        top_items = [it for it in relevant_items if (it.get("user_rating") or 0) >= 8.0] or relevant_items
+
+        top_notes = Counter()
+        favorite_makers = set()
+        for it in top_items:
+            if it.get("maker_or_brand"):
+                favorite_makers.add(it["maker_or_brand"])
+            for note in it.get("flavor_or_scent_notes", []):
+                top_notes[note.lower()] += 1
+
+        primary_accords = [n for n, _ in top_notes.most_common(6)]
+
+        # Curated taste seeds by category
+        catalogs: Dict[str, List[Dict[str, Any]]] = {
+            "whiskey": [
+                {"name": "Lagavulin 16 Year Old", "maker": "Lagavulin", "origin": "Islay, Scotland", "notes": ["peat", "smoke", "sea salt", "sherry wood", "rich dried fruit"]},
+                {"name": "Springbank 15", "maker": "Springbank", "origin": "Campbeltown, Scotland", "notes": ["dunnage warehouse", "toffee", "maritime", "subtle smoke", "leather"]},
+                {"name": "Glendronach 18 Allardice", "maker": "Glendronach", "origin": "Highlands, Scotland", "notes": ["oloroso sherry", "dark chocolate", "orange peel", "walnut"]},
+                {"name": "Yamazaki 12 Year", "maker": "Suntory", "origin": "Osaka, Japan", "notes": ["mizunara oak", "persimmon", "peach", "clove", "candied orange"]},
+                {"name": "Redbreast 12 Cask Strength", "maker": "Midleton", "origin": "Cork, Ireland", "notes": ["pot still spice", "creamy vanilla", "dried fruits", "toasted oak"]},
+            ],
+            "gin": [
+                {"name": "Monkey 47 Schwarzwald Dry", "maker": "Black Forest Distillers", "origin": "Germany", "notes": ["lingonberries", "spruce", "complex botanicals", "juniper", "citrus"]},
+                {"name": "The Botanist Islay Dry", "maker": "Bruichladdich", "origin": "Islay, Scotland", "notes": ["foraged florals", "chamomile", "thistle", "crisp citrus", "herbal"]},
+                {"name": "Ki No Bi Kyoto Dry Gin", "maker": "Kyoto Distillery", "origin": "Kyoto, Japan", "notes": ["yuzu", "sansho pepper", "gyokuro tea", "hinoki cypress"]},
+                {"name": "Hendrick's Neptunia", "maker": "Hendrick's", "origin": "Girvan, Scotland", "notes": ["coastal botanicals", "cucumber", "rose", "sea breeze"]},
+            ],
+            "wine": [
+                {"name": "Barolo Monprivato", "maker": "Giuseppe Mascarello", "origin": "Piedmont, Italy", "notes": ["tar and roses", "red cherry", "truffle", "refined tannins", "mineral"]},
+                {"name": "Gevrey-Chambertin", "maker": "Domaine Armand Rousseau", "origin": "Burgundy, France", "notes": ["pinot noir", "forest floor", "wild strawberry", "spice", "silky"]},
+                {"name": "Viña Tondonia Reserva", "maker": "R. López de Heredia", "origin": "Rioja, Spain", "notes": ["tempranillo", "cigar box", "dried cherry", "vanilla", "balsamic"]},
+                {"name": "Cornas 'Reynard'", "maker": "Thierry Allemand", "origin": "Northern Rhône, France", "notes": ["syrah", "crushed black pepper", "black olive", "smoky granite"]},
+            ],
+            "coffee": [
+                {"name": "Worka Sakaro Anaerobic Natural", "maker": "Sey Coffee / Manhattan", "origin": "Gedeb, Yirgacheffe, Ethiopia", "notes": ["jasmine", "wild blueberry", "candied peach", "sparkling citrus"]},
+                {"name": "Elida Estate Geisha Washed", "maker": "Lamastus Family Estates", "origin": "Boquete, Panama", "notes": ["bergamot", "white peach", "lemongrass", "silky tea body"]},
+                {"name": "Pink Bourbon Thermal Shock", "maker": "Diego Bermudez", "origin": "Cauca, Colombia", "notes": ["tropical passionfruit", "strawberry cream", "lavender", "complex sweetness"]},
+            ],
+            "tea": [
+                {"name": "Da Hong Pao (Big Red Robe)", "maker": "Wuyi Rock Tea Estate", "origin": "Wuyi Mountains, Fujian, China", "notes": ["mineral rock rhyme", "roasted orchid", "honeyed wood", "long sweet finish"]},
+                {"name": "Uji Gyokuro 'Pearl Dew'", "maker": "Ippodo Tea", "origin": "Kyoto, Japan", "notes": ["deep umami", "sweet seaweed", "steamed sencha greens", "velvety mouthfeel"]},
+                {"name": "Moonlight White (Yue Guang Bai)", "maker": "Jinggu Mountain Craft", "origin": "Yunnan, China", "notes": ["wild floral nectar", "apricot", "subtle beeswax", "smooth amber"]},
+                {"name": "First Flush Darjeeling Castleton", "maker": "Castleton Estate", "origin": "Darjeeling, India", "notes": ["muscatel grape", "green almond", "crisp morning floral", "zesty"]},
+            ],
+            "chocolate": [
+                {"name": "Guanaja 70%", "maker": "Valrhona", "origin": "Grand Cru Blend", "notes": ["intense dark cocoa", "warm wood", "roasted nuts", "elegant bitterness"]},
+                {"name": "Porcelana 70% Single Origin", "maker": "Amedei", "origin": "Zulia, Venezuela", "notes": ["pure criollo", "toasted almond", "olive wood", "butterscotch", "low acidity"]},
+                {"name": "Madagascar Sambirano 72%", "maker": "Dick Taylor / Akesson's", "origin": "Sambirano Valley, Madagascar", "notes": ["bright raspberry", "citrus acidity", "molasses", "fruity wine finish"]},
+            ],
+            "perfume": [
+                {"name": "Oud Wood", "maker": "Tom Ford Private Blend", "origin": "USA", "notes": ["rare oud", "rosewood", "cardamom", "sichuan pepper", "sandalwood", "amber", "tonka bean"]},
+                {"name": "Gris Charnel Extrait", "maker": "BDK Parfums", "origin": "Paris, France", "notes": ["cardamom", "black tea", "fig", "bourbon vetiver", "sandalwood", "tonka"]},
+                {"name": "Portrait of a Lady", "maker": "Editions de Parfums Frédéric Malle", "origin": "France", "notes": ["turkish rose", "patchouli", "frankincense", "blackcurrant", "cinnamon"]},
+                {"name": "Grand Soir", "maker": "Maison Francis Kurkdjian", "origin": "Paris, France", "notes": ["cistus labdanum", "benzoin", "vanilla", "amber accord", "tonka bean"]},
+            ],
+            "watch": [
+                {"name": "Speedmaster Professional 'Moonwatch'", "maker": "Omega", "origin": "Switzerland", "notes": ["caliber 3861 co-axial", "step dial", "hesalite or sapphire", "iconic chronograph"]},
+                {"name": "Submariner Date Ref. 126610LN", "maker": "Rolex", "origin": "Switzerland", "notes": ["caliber 3235", "cerachrom bezel", "300m water resistance", "oystersteel"]},
+                {"name": "Santos de Cartier Medium", "maker": "Cartier", "origin": "France/Switzerland", "notes": ["caliber 1847 mc", "smartlink bracelet", "art deco aesthetic", "square case"]},
+                {"name": "Grand Seiko 'Snowflake' SBGA211", "maker": "Grand Seiko", "origin": "Japan", "notes": ["spring drive 9r65", "zaratsu polishing", "titanium case", "snow texture dial"]},
+            ],
+        }
+
+        # Filter out what's already in the vault
+        existing_names = {str(it.get("name", "")).lower() for it in items}
+
+        selected_category = cat_norm if cat_norm in catalogs else "whiskey"
+        pool = catalogs.get(selected_category, catalogs["whiskey"])
+
+        recommendations = []
+        for candidate in pool:
+            if candidate["name"].lower() in existing_names:
+                continue
+
+            # Calculate match score based on shared flavor/scent notes
+            cand_notes = candidate.get("notes", [])
+            matches = [n for n in cand_notes if any(n in top_n or top_n in n for top_n in primary_accords)]
+            affinity_score = 80 + min(18, len(matches) * 6)
+
+            match_reason = f"Shares affinity with your top sensory notes: {', '.join(matches[:3])}" if matches else f"Matches your affinity for artisanal {candidate['maker']} craftsmanship."
+
+            recommendations.append({
+                "category": selected_category,
+                "name": candidate["name"],
+                "maker_or_brand": candidate["maker"],
+                "origin_or_region": candidate["origin"],
+                "affinity_score": f"{affinity_score}% Match",
+                "flavor_or_scent_notes": cand_notes,
+                "why_you_will_love_this": match_reason,
+            })
+            if len(recommendations) >= limit:
+                break
+
+        return {
+            "status": "success",
+            "category": selected_category,
+            "user_taste_anchors": {
+                "top_sensory_accords": primary_accords[:5],
+                "favorite_makers": list(favorite_makers)[:4],
+            },
+            "recommendations": recommendations,
+        }
+
+    # ========================================================================
+    # RESTAURANT & FINE DINING RECOMMENDATIONS
+    # ========================================================================
+
+    def get_restaurant_recommendations(
+        self,
+        city: Optional[str] = None,
+        vibe: Optional[str] = None,
+        cuisine: Optional[str] = None,
+        limit: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Synthesize dining and culinary recommendations based on user's past favorite restaurants,
+        preferred ambiance vibe tags, and desired city.
+        """
+        if not self.restaurant_service:
+            return {"status": "error", "message": "RestaurantService not configured."}
+
+        all_restaurants = self.restaurant_service.stream_all()
+        visited = [r for r in all_restaurants if r.get("status") == "visited"]
+        top_visited = [r for r in visited if (r.get("user_rating") or 0) >= 8.0] or visited
+
+        vibe_counts = Counter()
+        cuisine_counts = Counter()
+        for r in top_visited:
+            if r.get("cuisine"):
+                cuisine_counts[r["cuisine"]] += 1
+            for v in r.get("vibe_tags", []):
+                vibe_counts[v.lower()] += 1
+
+        top_vibes = [v for v, _ in vibe_counts.most_common(4)]
+        top_cuisines = [c for c, _ in cuisine_counts.most_common(3)]
+
+        target_city = city.strip().title() if city else "Tokyo"
+
+        # Curated gastro destinations by city
+        city_catalog: Dict[str, List[Dict[str, Any]]] = {
+            "Tokyo": [
+                {"name": "Sushi Sawada", "neighborhood": "Ginza", "cuisine": "Omakase", "michelin": "2-Star", "vibes": ["intimate counter", "traditional", "artisan master"], "signature": "Wild Bluefin Tuna flight, Aged Kohada"},
+                {"name": "L'Effervescence", "neighborhood": "Nishi-Azabu", "cuisine": "French-Japanese", "michelin": "3-Star", "vibes": ["zen elegance", "sustainable", "poetic storytelling"], "signature": "Whole Roasted Turnip, Autumn Mont Blanc"},
+                {"name": "Florilège", "neighborhood": "Toranomon", "cuisine": "Modern French", "michelin": "2-Star", "vibes": ["open counter kitchen", "theatrical", "plant-forward"], "signature": "Beef carpaccio with smoked potato purée"},
+                {"name": "Yakitori Torishiki", "neighborhood": "Meguro", "cuisine": "Yakitori", "michelin": "1-Star", "vibes": ["binchotan mastery", "counter only", "pure focus"], "signature": "Tsukune, Chicken skin, Smoked quail eggs"},
+            ],
+            "Paris": [
+                {"name": "Septime", "neighborhood": "11th Arr.", "cuisine": "Neo-Bistro", "michelin": "1-Star", "vibes": ["natural wine", "relaxed excellence", "seasonal produce"], "signature": "Hay-smoked egg yolk with mushrooms"},
+                {"name": "Plénitude", "neighborhood": "Cheval Blanc", "cuisine": "Modern French", "michelin": "3-Star", "vibes": ["broth & bouillon alchemy", "luxury sanctuary", "haute gastronomy"], "signature": "Ode to Broths, Sea bass in velvety emulsion"},
+                {"name": "Clamato", "neighborhood": "Charonne", "cuisine": "Seafood Bar", "michelin": "Selected", "vibes": ["walk-in only", "lively counter", "natural wines", "raw bar"], "signature": "Ceviche with smoked oil, Mapo tofu with clams"},
+            ],
+            "New York": [
+                {"name": "Le Bernardin", "neighborhood": "Midtown", "cuisine": "French Seafood", "michelin": "3-Star", "vibes": ["white tablecloth", "impeccable service", "timeless luxury"], "signature": "Tuna Tartare on toasted baguette, Poached Halibut"},
+                {"name": "Atomix", "neighborhood": "NoMad", "cuisine": "Modern Korean", "michelin": "2-Star", "vibes": ["intimate horseshoe counter", "curated cards", "cutting-edge"], "signature": "Langoustine with smoked butter, Fermented chili sorbet"},
+                {"name": "Via Carota", "neighborhood": "West Village", "cuisine": "Italian", "michelin": "Bib Gourmand", "vibes": ["rustic elegance", "bustling neighborhood gem", "exceptional pasta"], "signature": "Insalata Verde, Cacio e Pepe, Meyer lemon risotto"},
+            ],
+            "London": [
+                {"name": "The Ledbury", "neighborhood": "Notting Hill", "cuisine": "Modern British", "michelin": "3-Star", "vibes": ["warm hospitality", "foraged British ingredients", "refined game"], "signature": "Jersey Royal potatoes with seaweed, Smoked deer"},
+                {"name": "Brat", "neighborhood": "Shoreditch", "cuisine": "Basque-British", "michelin": "1-Star", "vibes": ["open wood-fire grill", "convivial upstairs loft", "low-intervention wine"], "signature": "Whole turbot grilled over wood coals, Burnt cheesecake"},
+                {"name": "St. JOHN", "neighborhood": "Smithfield", "cuisine": "Nose-to-Tail British", "michelin": "1-Star", "vibes": ["minimalist temple", "timeless classics", "unfussy brilliance"], "signature": "Roast bone marrow and parsley salad, Eccles cake"},
+            ],
+        }
+
+        existing_names = {str(r.get("name", "")).lower() for r in all_restaurants}
+        candidates = city_catalog.get(target_city, city_catalog["Tokyo"])
+
+        recommendations = []
+        for cand in candidates:
+            if cand["name"].lower() in existing_names:
+                continue
+
+            vibe_matches = [v for v in cand["vibes"] if any(v in tv or tv in v for tv in top_vibes)]
+            match_reason = f"Matches your love for {cand['cuisine']} and vibes like {', '.join(vibe_matches or cand['vibes'][:2])}."
+
+            recommendations.append({
+                "city": target_city,
+                "name": cand["name"],
+                "neighborhood": cand["neighborhood"],
+                "cuisine": cand["cuisine"],
+                "michelin_status": cand["michelin"],
+                "standout_dishes": [cand["signature"]],
+                "vibe_tags": cand["vibes"],
+                "why_you_will_love_this": match_reason,
+            })
+            if len(recommendations) >= limit:
+                break
+
+        return {
+            "status": "success",
+            "city": target_city,
+            "user_dining_anchors": {
+                "top_cuisines": top_cuisines,
+                "favorite_vibes": top_vibes,
+            },
+            "recommendations": recommendations,
         }

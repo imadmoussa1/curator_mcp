@@ -20,10 +20,13 @@ from services import (
     MediaService,
     QuoteService,
     PodcastService,
+    SensoryService,
+    RestaurantService,
     RecommendationService,
     BookMetadataClient,
     TMDBClient,
     ApplePodcastsClient,
+    ConnoisseurCatalogClient,
 )
 
 # Initialize FastMCP Server
@@ -34,10 +37,13 @@ book_service = BookService()
 media_service = MediaService()
 quote_service = QuoteService()
 podcast_service = PodcastService()
+sensory_service = SensoryService()
+restaurant_service = RestaurantService()
 
 books_client = BookMetadataClient()
 tmdb_client = TMDBClient()
 podcast_client = ApplePodcastsClient()
+catalog_client = ConnoisseurCatalogClient()
 
 recommendation_service = RecommendationService(
     book_service=book_service,
@@ -46,6 +52,8 @@ recommendation_service = RecommendationService(
     tmdb_client=tmdb_client,
     quote_service=quote_service,
     podcast_service=podcast_service,
+    sensory_service=sensory_service,
+    restaurant_service=restaurant_service,
 )
 
 
@@ -68,14 +76,17 @@ def get_user_taste_profile() -> Dict[str, Any]:
 @mcp.tool()
 def get_entertainment_stats() -> Dict[str, Any]:
     """
-    Get macro metrics across all collections: Books, Movies/Series, Quotes, and Podcasts.
-    Returns counts, shelf breakdowns, and average ratings.
+    Get macro metrics across all collections: Books, Movies/Series, Quotes, Podcasts,
+    Sensory Vault (Tea, Whiskey, Coffee, Gin, Wine, Chocolate, Perfume, Watches), and Restaurants.
+    Returns counts, breakdowns, and average ratings.
     """
     return {
         "books": book_service.get_stats(),
         "media": media_service.get_stats(),
         "quotes": {"total": len(quote_service.stream_all())},
         "podcasts": podcast_service.get_stats(),
+        "sensory_vault": sensory_service.get_stats(),
+        "restaurants": restaurant_service.get_stats(),
     }
 
 
@@ -585,6 +596,297 @@ def lookup_podcast_online(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     Works free with zero API key required.
     """
     return podcast_client.search(show_name=query, limit=limit)
+
+
+# ============================================================================
+# 6. SENSORY & CONNOISSEUR VAULT
+# (Tea, Whiskey, Coffee, Gin, Wine, Chocolate, Perfume, Watches)
+# ============================================================================
+
+@mcp.tool()
+def log_sensory_item(
+    category: str,
+    name: str,
+    maker_or_brand: str,
+    origin_or_region: Optional[str] = None,
+    vintage_or_year: Optional[str] = None,
+    status: str = "owned",
+    user_rating: Optional[float] = None,
+    flavor_or_scent_notes: Optional[List[str]] = None,
+    specs: Optional[Dict[str, Any]] = None,
+    review: Optional[str] = "",
+    personal_notes: Optional[str] = "",
+    price_tier: Optional[str] = None,
+    date_experienced: Optional[str] = None,
+    item_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Log or upsert an artisanal, sensory, or luxury item in your Sensory Vault.
+    Supported categories:
+    - 'tea': Loose-leaf, matcha, oolongs, pu-erh (specs: brew_temp, steep_time, oxidation)
+    - 'whiskey': Single malt, bourbon, rye, Japanese (specs: cask, abv, peat_level)
+    - 'coffee': Specialty coffee beans & origins (specs: roast_level, process, altitude)
+    - 'gin': Craft gins & spirits (specs: botanicals, abv, style)
+    - 'wine': Fine wine & vintages (specs: varietal, body, tannin, acidity)
+    - 'chocolate': Bean-to-bar & single-origin (specs: cacao_pct, bean_origin, conching)
+    - 'perfume': Fragrances & niche scents (specs: top_notes, heart_notes, base_notes, concentration)
+    - 'watch': Horology & luxury timepieces (specs: caliber, case_size_mm, power_reserve, water_resistance)
+
+    Args:
+        category: tea, whiskey, coffee, gin, wine, chocolate, perfume, watch
+        name: Name of item or edition (e.g. 'Lagavulin 16', 'Baccarat Rouge 540', 'Speedmaster Pro')
+        maker_or_brand: Producer, distillery, roaster, perfumer, or watchmaker
+        origin_or_region: Origin/terroir (e.g. 'Islay', 'Grasse, France', 'Yirgacheffe, Ethiopia')
+        vintage_or_year: Vintage year or watch reference number (e.g. '2018' or 'Ref. 126610LN')
+        status: 'owned' (in cabinet/collection), 'wishlist', 'sampled', 'finished'
+        user_rating: 1.0 to 10.0 scale
+        flavor_or_scent_notes: Tasting wheel descriptors or olfactory accords (e.g. ['peat', 'smoke', 'vanilla'])
+        specs: Domain technical details dictionary
+        review: Tasting review, olfactory impression, or horology review
+        personal_notes: Private cellar bin, batch info, or purchase price
+        price_tier: $, $$, $$$, $$$$, or $$$$$
+    """
+    return sensory_service.log_item(
+        category=category,
+        name=name,
+        maker_or_brand=maker_or_brand,
+        origin_or_region=origin_or_region,
+        vintage_or_year=vintage_or_year,
+        status=status,
+        user_rating=user_rating,
+        flavor_or_scent_notes=flavor_or_scent_notes,
+        specs=specs,
+        review=review,
+        personal_notes=personal_notes,
+        price_tier=price_tier,
+        date_experienced=date_experienced,
+        item_id=item_id,
+    )
+
+
+@mcp.tool()
+def update_sensory_item(
+    item_id: str,
+    user_rating: Optional[float] = None,
+    status: Optional[str] = None,
+    review: Optional[str] = None,
+    personal_notes: Optional[str] = None,
+    flavor_or_scent_notes: Optional[List[str]] = None,
+    specs: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Update tasting impressions, rating, or status (e.g. mark wishlist item as sampled or owned).
+    """
+    return sensory_service.update_item(
+        item_id=item_id,
+        user_rating=user_rating,
+        status=status,
+        review=review,
+        personal_notes=personal_notes,
+        flavor_or_scent_notes=flavor_or_scent_notes,
+        specs=specs,
+    )
+
+
+@mcp.tool()
+def search_sensory_vault(
+    query: str = "",
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    min_rating: Optional[float] = None,
+    tag: Optional[str] = None,
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """
+    Search your personal sensory vault (tea, coffee, whiskey, gin, wine, chocolate, perfume, watches)
+    by keyword, category, status (owned/wishlist/sampled), minimum rating, or flavor/scent tag.
+    """
+    return sensory_service.search(
+        query=query,
+        category=category,
+        status=status,
+        min_rating=min_rating,
+        tag=tag,
+        limit=limit,
+    )
+
+
+@mcp.tool()
+def get_sensory_taste_profile() -> Dict[str, Any]:
+    """
+    Retrieve an aggregated connoisseur sensory profile: top flavor notes, favorite distillers/perfumers/makers,
+    preferred terroirs and origins, and highlight masterpieces across the sensory vault.
+    """
+    return recommendation_service.get_sensory_taste_profile()
+
+
+@mcp.tool()
+def get_sensory_recommendations(
+    category: Optional[str] = None,
+    mood: Optional[str] = None,
+    limit: int = 5,
+) -> Dict[str, Any]:
+    """
+    Generate intelligent luxury, spirits, coffee, tea, chocolate, perfume, or watch recommendations
+    synthesized from your highest rated flavor notes, proven makers, and olfactory accords.
+    Args:
+        category: 'tea', 'coffee', 'whiskey', 'gin', 'wine', 'chocolate', 'perfume', or 'watch'
+        mood: Optional vibe or flavor preference (e.g. 'peaty', 'floral', 'autumn', 'vintage')
+        limit: Max recommendations
+    """
+    return recommendation_service.get_sensory_recommendations(
+        category=category,
+        mood=mood,
+        limit=limit,
+    )
+
+
+@mcp.tool()
+def search_open_product_catalog(
+    category: str,
+    query: str,
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    """
+    Query open product databases (Open Food Facts & Whisky Hunter) for tea, coffee, wine, chocolate, or whisky.
+    Returns product names, brands, origins, barcodes, and distilleries.
+    Works free with zero API key required.
+    """
+    return catalog_client.search_catalog(category=category, query=query, limit=limit)
+
+
+# ============================================================================
+# 7. FINE DINING & RESTAURANT JOURNAL
+# ============================================================================
+
+@mcp.tool()
+def log_restaurant(
+    name: str,
+    city: str,
+    cuisine: str,
+    neighborhood: Optional[str] = None,
+    status: str = "visited",
+    user_rating: Optional[float] = None,
+    michelin_status: Optional[str] = None,
+    price_tier: Optional[str] = None,
+    standout_dishes: Optional[List[str]] = None,
+    notes_and_review: Optional[str] = "",
+    vibe_tags: Optional[List[str]] = None,
+    url_or_reservation: Optional[str] = None,
+    date_visited: Optional[str] = None,
+    restaurant_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Log a restaurant visit or add a restaurant/cafe/wine bar to your dining wishlist.
+    Args:
+        name: Name of venue (e.g. 'Le Bernardin', 'Septime', 'Sushi Sawada')
+        city: City (e.g. 'New York', 'Paris', 'Tokyo', 'London')
+        cuisine: Cuisine type (e.g. 'Omakase', 'Modern French', 'Neo-Bistro', 'Italian')
+        neighborhood: District (e.g. 'Ginza', 'SoHo', '11th Arr.')
+        status: 'visited' (dined at), 'wishlist' (want to go), 'booked' (upcoming reservation)
+        user_rating: 1.0 to 10.0 scale
+        michelin_status: '1-Star', '2-Star', '3-Star', 'Bib Gourmand', 'Selected', or None
+        price_tier: $, $$, $$$, or $$$$
+        standout_dishes: Memorable dishes, tasting menu highlights, or signature courses
+        notes_and_review: Food critique, wine pairing comments, service & ambiance
+        vibe_tags: Atmosphere tags (e.g. ['romantic', 'intimate counter', 'natural wine', 'wood fire'])
+        url_or_reservation: Link to Resy, OpenTable, TableCheck, or website
+        date_visited: YYYY-MM-DD format
+    """
+    return restaurant_service.log_restaurant(
+        name=name,
+        city=city,
+        cuisine=cuisine,
+        neighborhood=neighborhood,
+        status=status,
+        user_rating=user_rating,
+        michelin_status=michelin_status,
+        price_tier=price_tier,
+        standout_dishes=standout_dishes,
+        notes_and_review=notes_and_review,
+        vibe_tags=vibe_tags,
+        url_or_reservation=url_or_reservation,
+        date_visited=date_visited,
+        restaurant_id=restaurant_id,
+    )
+
+
+@mcp.tool()
+def update_restaurant(
+    restaurant_id: str,
+    status: Optional[str] = None,
+    user_rating: Optional[float] = None,
+    standout_dishes: Optional[List[str]] = None,
+    notes_and_review: Optional[str] = None,
+    vibe_tags: Optional[List[str]] = None,
+    date_visited: Optional[str] = None,
+    url_or_reservation: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Update dining notes, dishes, or change status from wishlist to visited with rating.
+    """
+    return restaurant_service.update_restaurant(
+        restaurant_id=restaurant_id,
+        status=status,
+        user_rating=user_rating,
+        standout_dishes=standout_dishes,
+        notes_and_review=notes_and_review,
+        vibe_tags=vibe_tags,
+        date_visited=date_visited,
+        url_or_reservation=url_or_reservation,
+    )
+
+
+@mcp.tool()
+def search_restaurants(
+    query: str = "",
+    city: Optional[str] = None,
+    cuisine: Optional[str] = None,
+    status: Optional[str] = None,
+    vibe: Optional[str] = None,
+    min_rating: Optional[float] = None,
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """
+    Search your dining vault and wishlists by keyword, city, cuisine, status (visited/wishlist), or vibe tag.
+    """
+    return restaurant_service.search(
+        query=query,
+        city=city,
+        cuisine=cuisine,
+        status=status,
+        vibe=vibe,
+        min_rating=min_rating,
+        limit=limit,
+    )
+
+
+@mcp.tool()
+def get_dining_stats() -> Dict[str, Any]:
+    """
+    Retrieve macro metrics on your dining life: total places visited, wishlist count,
+    top cities explored, top cuisines, Michelin-starred counts, and average ratings.
+    """
+    return restaurant_service.get_stats()
+
+
+@mcp.tool()
+def get_restaurant_recommendations(
+    city: Optional[str] = None,
+    vibe: Optional[str] = None,
+    cuisine: Optional[str] = None,
+    limit: int = 5,
+) -> Dict[str, Any]:
+    """
+    Generate personalized dining recommendations in target cities (e.g. Tokyo, Paris, New York, London)
+    synthesized from your favorite dining ambiance tags, favorite cuisines, and high-rating history.
+    """
+    return recommendation_service.get_restaurant_recommendations(
+        city=city,
+        vibe=vibe,
+        cuisine=cuisine,
+        limit=limit,
+    )
 
 
 # ============================================================================

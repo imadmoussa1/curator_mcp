@@ -4,16 +4,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![FastMCP](https://img.shields.io/badge/MCP-FastMCP-brightgreen.svg)](https://github.com/jlowin/fastmcp)
 [![Google Cloud Firestore](https://img.shields.io/badge/Database-Firestore-orange.svg)](https://cloud.google.com/firestore)
-[![Tests: 21 Passing](https://img.shields.io/badge/tests-21%20passing-success.svg)](#-testing--quality-assurance)
+[![Tests: 36 Passing](https://img.shields.io/badge/tests-36%20passing-success.svg)](#-testing--quality-assurance)
 
-A production-grade **Model Context Protocol (MCP)** server and automated data ingestion pipeline that transforms **Google Cloud Firestore** into your private, intelligent entertainment memory, literature companion, knowledge vault, and AI curator.
+A production-grade **Model Context Protocol (MCP)** server and automated data ingestion pipeline that transforms **Google Cloud Firestore** into your private, intelligent entertainment memory, literature companion, knowledge vault, fine dining guide, and connoisseur taste curator.
 
 Connects natively to **Gemini**, **Claude Desktop**, **Antigravity IDE**, and other MCP-compliant agents, enabling natural language tracking and exploration across:
 1. **Books**: Library ingestion, to-read queue, currently-reading tracking, Google Books & Open Library live discovery.
 2. **Movies & TV**: IMDb ratings and watchlist ingestion, TMDB discovery, and automated similar-media recommendations.
 3. **Memorable Quotes & Mental Models**: Capturing principles, philosophies, and memorable dialogue with theme tagging and spaced retrieval.
 4. **Podcasts**: Queue management, listening logs, guest tracking, key takeaways, and zero-key Apple Podcasts discovery.
-5. **Taste Profiling & Smart Recommendations**: Synthesizes ratings across books and films to recommend new gems while strictly filtering out items already consumed or queued.
+5. **Sensory Vault**: Connoisseur tasting logs for **Tea, Whiskey, Coffee, Gin, Wine, Chocolate, Perfume, and Watches** with flavor wheel accords and domain specs.
+6. **Fine Dining & Restaurants**: Gastronomy journal, city guides, Michelin distinctions, signature dishes, and reservation wishlists.
+7. **Taste Profiling & Smart Recommendations**: Synthesizes ratings across books, films, sensory goods, and restaurants to recommend new gems while strictly filtering out items already consumed or queued.
 
 ---
 
@@ -194,14 +196,14 @@ python -m importers.imdb_importer --watchlist path/to/watchlist.csv
 
 ## 🛠️ Model Context Protocol (MCP) Tools
 
-The server registers **30 specialized tools** categorized across five domains:
+The server registers **41 specialized tools** categorized across seven domains:
 
 ### 1. Taste Profile, Curate My Night & Annual Wrapped
 | Tool Name | Parameters | Description |
 |---|---|---|
 | `get_user_taste_profile` | *none* | Aggregates favorite genres, top directors, authors, and 5★/10★ items. |
-| `get_entertainment_stats` | *none* | Macro metrics across books, media, quotes, and podcasts. |
-| `get_smart_recommendations` | `category`, `limit` | Intelligent AI recommender that queries similar items and excludes consumed/queued titles. |
+| `get_entertainment_stats` | *none* | Macro metrics across books, media, quotes, podcasts, sensory vault, and restaurants. |
+| `get_smart_recommendations` | `category`, `limit`, `mood` | Intelligent AI recommender that queries similar items and excludes consumed/queued titles. |
 | `curate_for_tonight` | `max_runtime_mins`, `genre`, `min_imdb_rating`, `media_type`, `count` | Smart evening picker that filters watchlist by runtime, mood, and ratings with match reasons. |
 | `generate_cultural_wrapped` | `year` | Comprehensive annual cultural retrospective with metrics and synthesized "Cultural Archetype". |
 
@@ -248,6 +250,25 @@ The server registers **30 specialized tools** categorized across five domains:
 | `get_podcast_queue` | `limit` | View upcoming podcast episodes. |
 | `search_podcasts` | `query`, `guest`, `topic`, `limit` | Search podcast archive by show, guest, or topic. |
 | `lookup_podcast_online` | `query`, `limit` | Free online search via Apple Podcasts API for artwork and feeds. |
+
+### 6. Sensory & Connoisseur Vault (Tea, Whiskey, Coffee, Gin, Wine, Chocolate, Perfume, Watches)
+| Tool Name | Parameters | Description |
+|---|---|---|
+| `log_sensory_item` | `category`, `name`, `maker_or_brand`, `origin_or_region`, `vintage_or_year`, `status`, `user_rating`, `flavor_or_scent_notes`, `specs`, `review`, `personal_notes`, `price_tier`, `date_experienced` | Log an artisanal item with tasting notes, olfactory accords, or horology specs. |
+| `update_sensory_item` | `item_id`, `user_rating`, `status`, `review`, `personal_notes`, `flavor_or_scent_notes`, `specs` | Update tasting notes, ratings, or mark wishlist item as sampled/owned. |
+| `search_sensory_vault` | `query`, `category`, `status`, `min_rating`, `tag`, `limit` | Search personal vault by keyword, category, status, rating, or flavor/scent tag. |
+| `get_sensory_taste_profile` | *none* | Aggregated flavor profile, top accords, and favorite distillers, roasters, or perfumers. |
+| `get_sensory_recommendations` | `category`, `mood`, `limit` | AI taste recommendations matching your highest-rated notes and artisan makers. |
+| `search_open_product_catalog` | `category`, `query`, `limit` | Free search across Open Food Facts (wines, teas, coffee, chocolate) and Whisky Hunter. |
+
+### 7. Fine Dining & Restaurant Journal
+| Tool Name | Parameters | Description |
+|---|---|---|
+| `log_restaurant` | `name`, `city`, `cuisine`, `neighborhood`, `status`, `user_rating`, `michelin_status`, `price_tier`, `standout_dishes`, `notes_and_review`, `vibe_tags`, `url_or_reservation`, `date_visited` | Log dining experiences or add to dining wishlist with dishes, vibes, and ratings. |
+| `update_restaurant` | `restaurant_id`, `status`, `user_rating`, `standout_dishes`, `notes_and_review`, `vibe_tags`, `date_visited`, `url_or_reservation` | Update food reviews, signature dishes, or convert wishlist to visited. |
+| `search_restaurants` | `query`, `city`, `cuisine`, `status`, `vibe`, `min_rating`, `limit` | Query dining history and wishlists by city, cuisine, vibe tag, or rating. |
+| `get_dining_stats` | *none* | Summary of places visited, cities explored, top cuisines, and Michelin star breakdown. |
+| `get_restaurant_recommendations` | `city`, `vibe`, `cuisine`, `limit` | Curated dining recommendations in top food capitals matching your preferred vibes. |
 
 ---
 
@@ -472,6 +493,36 @@ Once Curator MCP is connected to **Claude Desktop**, you can interact naturally 
 - *"What episodes are currently in my podcast queue?"*
   - 👉 **Tool called**: `get_podcast_queue`
 
+### 9. 🥃 Sensory & Connoisseur Vault (Tea, Whiskey, Coffee, Gin, Wine, Chocolate, Perfume, Watches)
+- *"Log a bottle of Lagavulin 16 in my whiskey cabinet. Rated 9.5/10 with flavor notes: peat, smoke, sea salt, sherry cask. Review: 'Quintessential Islay dram'."*
+  - 👉 **Tool called**: `log_sensory_item(category='whiskey', name='16 Year Old', maker_or_brand='Lagavulin', origin_or_region='Islay, Scotland', user_rating=9.5, flavor_or_scent_notes=['peat', 'smoke', 'sea salt', 'sherry cask'], specs={'abv': '43%', 'cask': 'sherry and bourbon'})`
+- *"Log Tom Ford Oud Wood to my perfume collection. Rate it 9.0/10 with olfactory notes: oud, rosewood, cardamom, amber. Specs: concentration Eau de Parfum."*
+  - 👉 **Tool called**: `log_sensory_item(category='perfume', name='Oud Wood', maker_or_brand='Tom Ford', user_rating=9.0, flavor_or_scent_notes=['oud', 'rosewood', 'cardamom', 'amber'], specs={'concentration': 'EDP'})`
+- *"I just got an Omega Speedmaster Professional Moonwatch. Log it to my watch collection with specs: caliber 3861, 42mm, manual wind."*
+  - 👉 **Tool called**: `log_sensory_item(category='watch', name="Speedmaster Professional 'Moonwatch'", maker_or_brand='Omega', specs={'caliber': '3861', 'case_size_mm': 42})`
+- *"Add Uji Gyokuro green tea from Ippodo to my tea cabinet with brewing specs: 50C water and 90 second steep time."*
+  - 👉 **Tool called**: `log_sensory_item(category='tea', name='Uji Gyokuro', maker_or_brand='Ippodo', specs={'brew_temp_c': 50, 'steep_time_secs': 90})`
+- *"Log Valrhona Guanaja 70% dark chocolate to my tasting vault. Rating: 8.8/10, notes: roasted cocoa, warm wood."*
+  - 👉 **Tool called**: `log_sensory_item(category='chocolate', name='Guanaja 70%', maker_or_brand='Valrhona', user_rating=8.8, flavor_or_scent_notes=['roasted cocoa', 'warm wood'])`
+- *"What are my top sensory flavor accords and favorite distillers across my collection?"*
+  - 👉 **Tool called**: `get_sensory_taste_profile`
+- *"Give me whiskey recommendations based on the peat and smoke flavor notes I love."*
+  - 👉 **Tool called**: `get_sensory_recommendations(category='whiskey', limit=3)`
+- *"Search open databases for artisanal chocolate from Valrhona."*
+  - 👉 **Tool called**: `search_open_product_catalog(category='chocolate', query='Valrhona')`
+
+### 10. 🍽️ Fine Dining & Restaurant Journal
+- *"Log my dinner at Septime in Paris. Rated 9.5/10, 1 Michelin Star, standout dishes: 'Smoked egg yolk with mushrooms', vibe tags: natural wine, relaxed excellence."*
+  - 👉 **Tool called**: `log_restaurant(name='Septime', city='Paris', cuisine='Neo-Bistro', user_rating=9.5, michelin_status='1-Star', standout_dishes=['Smoked egg yolk with mushrooms'], vibe_tags=['natural wine', 'relaxed excellence'])`
+- *"Add Sushi Sawada in Ginza, Tokyo to my dining wishlist. Cuisine: Omakase, 2 Michelin Stars."*
+  - 👉 **Tool called**: `log_restaurant(name='Sushi Sawada', city='Tokyo', cuisine='Omakase', status='wishlist', michelin_status='2-Star')`
+- *"What restaurants have I visited in Paris or New York?"*
+  - 👉 **Tool called**: `search_restaurants(city='Paris')`
+- *"Recommend great places to dine in Tokyo or London matching my love for counter seating and natural wine."*
+  - 👉 **Tool called**: `get_restaurant_recommendations(city='Tokyo', vibe='counter')`
+- *"Give me a summary of my dining statistics: cities explored, top cuisines, and Michelin breakdown."*
+  - 👉 **Tool called**: `get_dining_stats`
+
 ---
 
 ## 🔒 Security & Privacy Notice
@@ -493,15 +544,16 @@ This project is built for **public open-source publication** and adheres to stri
 The codebase includes an automated unit test suite:
 
 ```bash
-# Run all 27 unit tests
-.venv/bin/python -m unittest discover -s tests
+# Run all 36 unit tests with uv
+uv run python -m unittest discover -s tests
 ```
 
 Tests cover:
-- **Data Models**: Pydantic schema validation, shelf normalization, timestamp generation.
+- **Data Models**: Pydantic schema validation for Books, Media, Quotes, Podcasts, Sensory Items (tea, coffee, whiskey, gin, wine, chocolate, perfume, watch), and Restaurants.
 - **Importers**: Goodreads and IMDb CSV column mapping, Excel formatting cleanup, list field normalization.
-- **Domain Services**: `BookService`, `MediaService`, `QuoteService`, `PodcastService`, `RecommendationService`.
-- **External Clients**: Apple Podcasts API mocking, TMDB error resilience, and Google Books / Open Library HTTP fallbacks.
+- **Domain Services**: `BookService`, `MediaService`, `QuoteService`, `PodcastService`, `SensoryService`, `RestaurantService`, `RecommendationService`.
+- **Sensory & Dining Recommenders**: Multi-signal flavor accord matching, distillery/producer preference, and vibe-oriented dining recommendations.
+- **External Clients**: Apple Podcasts API, Open Food Facts & Whisky Hunter catalog client, TMDB error resilience, and Google Books / Open Library HTTP fallbacks.
 
 ---
 

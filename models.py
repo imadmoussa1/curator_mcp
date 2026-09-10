@@ -4,7 +4,8 @@ Validates books, media, quotes, and podcasts entries before writing to Firestore
 """
 
 from datetime import datetime, timezone
-from typing import List, Optional
+from enum import Enum
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -153,6 +154,143 @@ class PodcastModel(BaseModel):
     def validate_status(cls, v: str) -> str:
         v_clean = v.strip().lower()
         return "listened" if "listen" in v_clean or "done" in v_clean or "heard" in v_clean else "queue"
+
+    def to_firestore_dict(self) -> dict:
+        data = self.model_dump()
+        if not data.get("updated_at"):
+            data["updated_at"] = datetime.now(timezone.utc)
+        return data
+
+
+# ============================================================================
+# SENSORY & CONNOISSEUR VAULT MODELS
+# (Tea, Coffee, Whiskey, Gin, Wine, Chocolate, Perfume, Watches)
+# ============================================================================
+
+class SensoryCategory(str, Enum):
+    """Supported luxury, artisanal, and sensory item categories."""
+    TEA = "tea"
+    COFFEE = "coffee"
+    WHISKEY = "whiskey"
+    GIN = "gin"
+    WINE = "wine"
+    CHOCOLATE = "chocolate"
+    PERFUME = "perfume"
+    WATCH = "watch"
+
+
+class SensoryStatus(str, Enum):
+    """Collection status for sensory/connoisseur items."""
+    OWNED = "owned"          # In cellar, cabinet, humidor, or collection
+    WISHLIST = "wishlist"    # Want to acquire or sample
+    SAMPLED = "sampled"      # Tried at a tasting, flight, or cafe
+    FINISHED = "finished"    # Bottle emptied, bag finished, or sample depleted
+
+
+class SensoryItemModel(BaseModel):
+    """
+    Schema for sensory goods, luxury items, and tasting journal in 'sensory_vault'.
+    Supports tea, whiskey, coffee, gin, wine, chocolate, perfume, and watches.
+    """
+    id: str = Field(..., description="Unique Item ID (e.g. sens_tea_01, sens_whisk_02)")
+    category: str = Field(..., description="Category: tea, coffee, whiskey, gin, wine, chocolate, perfume, watch")
+    name: str = Field(..., description="Item or edition name (e.g. Hibiki 21, Baccarat Rouge 540, Yirgacheffe Natural)")
+    maker_or_brand: str = Field(..., description="Distillery, roaster, estate, perfumer, watchmaker, or chocolatier")
+    origin_or_region: Optional[str] = Field(default=None, description="Terroir, country, or region (e.g. Islay, Grasse, Uji, Oaxaca)")
+    vintage_or_year: Optional[str] = Field(default=None, description="Vintage year, batch, or watch reference number")
+    status: str = Field(default="owned", description="Status: owned, wishlist, sampled, finished")
+    user_rating: Optional[float] = Field(default=None, ge=1.0, le=10.0, description="Personal rating from 1.0 to 10.0")
+    flavor_or_scent_notes: List[str] = Field(default_factory=list, description="Tasting wheel tags or olfactory accords (e.g. smoky, peat, bergamot, iris, cacao)")
+    specs: Dict[str, Any] = Field(default_factory=dict, description="Domain technical specifications (cask, abv, process, caliber, steep temp, cacao %)")
+    review: str = Field(default="", description="Tasting critique, olfactory impression, or horology review")
+    personal_notes: str = Field(default="", description="Private notes, cellar bin, purchase price, or serving suggestions")
+    price_tier: Optional[str] = Field(default=None, description="Price tier: $, $$, $$$, $$$$, or $$$$$")
+    date_experienced: Optional[str] = Field(default=None, description="Date tasted, acquired, or worn in YYYY-MM-DD format")
+    updated_at: Optional[datetime] = Field(default=None, description="Timestamp of creation/update")
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, v: str) -> str:
+        v_clean = v.strip().lower()
+        valid_cats = {c.value for c in SensoryCategory}
+        # Normalize common synonyms
+        synonyms = {
+            "whisky": "whiskey",
+            "scotch": "whiskey",
+            "bourbon": "whiskey",
+            "fragrance": "perfume",
+            "cologne": "perfume",
+            "scent": "perfume",
+            "watches": "watch",
+            "timepiece": "watch",
+            "horology": "watch",
+            "cacao": "chocolate",
+            "choc": "chocolate",
+        }
+        normalized = synonyms.get(v_clean, v_clean)
+        if normalized in valid_cats:
+            return normalized
+        return v_clean
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        v_clean = v.strip().lower()
+        if "wish" in v_clean or "want" in v_clean:
+            return "wishlist"
+        if "sample" in v_clean or "tasted" in v_clean or "tried" in v_clean:
+            return "sampled"
+        if "finish" in v_clean or "empty" in v_clean or "done" in v_clean:
+            return "finished"
+        return "owned"
+
+    def to_firestore_dict(self) -> dict:
+        data = self.model_dump()
+        if not data.get("updated_at"):
+            data["updated_at"] = datetime.now(timezone.utc)
+        return data
+
+
+# ============================================================================
+# RESTAURANTS & FINE DINING MODELS
+# ============================================================================
+
+class RestaurantStatus(str, Enum):
+    """Dining wishlist & visit tracking status."""
+    VISITED = "visited"      # Dined at
+    WISHLIST = "wishlist"    # Want to visit / on radar
+    BOOKED = "booked"        # Upcoming confirmed reservation
+
+
+class RestaurantModel(BaseModel):
+    """
+    Schema for restaurants, cafes, wine bars, and culinary experiences in 'restaurants'.
+    """
+    id: str = Field(..., description="Unique Restaurant ID (e.g. rest_le_bernardin)")
+    name: str = Field(..., description="Name of the restaurant or venue")
+    city: str = Field(..., description="City (e.g. Tokyo, Paris, New York, London)")
+    neighborhood: Optional[str] = Field(default=None, description="District or area (e.g. Ginza, Mayfair, SoHo, Marais)")
+    cuisine: str = Field(..., description="Cuisine type (e.g. Omakase, Modern French, Neo-Bistro, Basque)")
+    status: str = Field(default="visited", description="Status: visited, wishlist, booked")
+    user_rating: Optional[float] = Field(default=None, ge=1.0, le=10.0, description="Personal rating from 1.0 to 10.0")
+    michelin_status: Optional[str] = Field(default=None, description="Michelin distinction: 1-Star, 2-Star, 3-Star, Bib Gourmand, Selected, or None")
+    price_tier: Optional[str] = Field(default=None, description="Price tier: $, $$, $$$, or $$$$")
+    standout_dishes: List[str] = Field(default_factory=list, description="Memorable dishes, tasting menu highlights, or signature courses")
+    notes_and_review: str = Field(default="", description="Detailed food review, wine pairing critique, service & ambiance impressions")
+    vibe_tags: List[str] = Field(default_factory=list, description="Atmosphere tags (e.g. romantic, counter seating, late night, natural wine)")
+    url_or_reservation: Optional[str] = Field(default=None, description="Link to Resy, OpenTable, TableCheck, or website")
+    date_visited: Optional[str] = Field(default=None, description="Date visited in YYYY-MM-DD format")
+    updated_at: Optional[datetime] = Field(default=None, description="Timestamp of creation/update")
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        v_clean = v.strip().lower()
+        if "wish" in v_clean or "radar" in v_clean or "want" in v_clean:
+            return "wishlist"
+        if "book" in v_clean or "reserv" in v_clean or "upcoming" in v_clean:
+            return "booked"
+        return "visited"
 
     def to_firestore_dict(self) -> dict:
         data = self.model_dump()
