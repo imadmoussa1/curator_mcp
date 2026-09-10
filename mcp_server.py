@@ -336,7 +336,6 @@ def vet_recommendation_candidate(
     )
 
 
-
 @mcp.tool()
 def generate_cultural_wrapped(year: Optional[int] = None) -> Dict[str, Any]:
     """

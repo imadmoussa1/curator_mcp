@@ -5,14 +5,10 @@ Unit tests for domain services, OOP repositories, and external API clients.
 import unittest
 from unittest.mock import MagicMock, patch
 
-from models import BookModel, MediaModel, QuoteModel, PodcastModel
 from services.book_service import BookService
 from services.media_service import MediaService
 from services.quote_service import QuoteService
 from services.podcast_service import PodcastService
-from services.recommendation_service import RecommendationService
-from services.external.books_client import BookMetadataClient
-from services.external.tmdb_client import TMDBClient
 from services.external.podcasts_client import ApplePodcastsClient
 from importers import GoodreadsImporter, IMDbImporter
 

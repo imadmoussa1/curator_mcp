@@ -6,10 +6,7 @@ and Restaurant & Fine Dining models, services, and recommendation algorithms.
 import unittest
 from unittest.mock import MagicMock, patch
 from models import (
-    SensoryCategory,
-    SensoryStatus,
     SensoryItemModel,
-    RestaurantStatus,
     RestaurantModel,
 )
 from services.sensory_service import SensoryService

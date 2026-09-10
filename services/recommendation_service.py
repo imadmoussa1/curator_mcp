@@ -229,6 +229,12 @@ class RecommendationService:
                         match_score += 7
                         reasons.append(f"Matches your high affinity for {', '.join(shared_genres)}")
 
+                    rec_directors = [d.lower() for d in r.get("directors", [])]
+                    shared_dirs = [d.title() for d in rec_directors if d in top_fav_directors]
+                    if shared_dirs:
+                        match_score += 8
+                        reasons.append(f"Directed by {', '.join(shared_dirs)}, one of your favorite filmmakers")
+
                     vote_avg = r.get("vote_average") or 0.0
                     if vote_avg >= 8.0:
                         match_score += 5
@@ -1070,4 +1076,3 @@ class RecommendationService:
             "personalization_tethers": hooks,
             "verdict": "Vetted successfully. Safe and highly recommended to present to the user.",
         }
-

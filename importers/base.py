@@ -4,7 +4,6 @@ Base importer class handling batch writes and chunking into Firestore.
 
 from abc import ABC, abstractmethod
 from typing import List, Any
-import pandas as pd
 from config import get_db
 
 

@@ -5,7 +5,6 @@ with sensory connoisseur goods (tea, coffee, whiskey, gin, wine, chocolate, perf
 """
 
 from typing import Optional, List, Dict, Any
-import re
 
 
 class PairingService:

@@ -3,7 +3,7 @@ Unit tests for external API services (Google Books and TMDB).
 """
 
 import unittest
-from services.external_api import search_google_books, find_similar_books, search_tmdb, find_similar_media
+from services.external_api import search_google_books, find_similar_books, search_tmdb
 
 
 class TestExternalApiServices(unittest.TestCase):

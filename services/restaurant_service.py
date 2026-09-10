@@ -10,7 +10,7 @@ import re
 from typing import Optional, List, Dict, Any
 from collections import Counter
 
-from models import RestaurantModel, RestaurantStatus
+from models import RestaurantModel
 from services.base_repository import BaseFirestoreRepository
 
 

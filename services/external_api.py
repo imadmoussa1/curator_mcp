@@ -4,7 +4,6 @@ External API client for Book & Media Discovery:
 - Media: The Movie Database (TMDB) API for plot overviews, posters, and recommendation engines.
 """
 
-import os
 from typing import Optional, List, Dict, Any
 import requests
 
@@ -398,4 +397,3 @@ def search_podcast_online(query: str, limit: int = 5) -> List[Dict[str, Any]]:
         })
 
     return results
-
