@@ -28,6 +28,7 @@ class RecommendationService:
         podcast_service: Optional[Any] = None,
         sensory_service: Optional[Any] = None,
         restaurant_service: Optional[Any] = None,
+        memory_service: Optional[Any] = None,
     ):
         self.book_service = book_service
         self.media_service = media_service
@@ -37,6 +38,7 @@ class RecommendationService:
         self.podcast_service = podcast_service
         self.sensory_service = sensory_service
         self.restaurant_service = restaurant_service
+        self.memory_service = memory_service
 
     def get_taste_profile(self) -> Dict[str, Any]:
         """
@@ -521,6 +523,25 @@ class RecommendationService:
                 "message": f"Unsupported or unconfigured domain '{domain}'. Supported domains: books, movies, tv, whiskey, coffee, tea, wine, gin, chocolate, perfume, watch, restaurants, podcasts.",
             }
 
+        # Seamlessly incorporate remembered user preferences, habits, and constraints
+        remembered_preferences = []
+        if self.memory_service:
+            memory_constraints = self.memory_service.get_relevant_constraints(domain=dom)
+            guardrails.extend(memory_constraints)
+            remembered_preferences = [
+                m.get("content") for m in self.memory_service.recall(query=dom, category="preference", limit=5)
+            ]
+
+        taste_dna: Dict[str, Any] = {
+            "top_rated_anchors": top_anchors[:8],
+            "dominant_affinities": {
+                "creators_or_cuisines": [c for c, _ in fav_creators.most_common(5)],
+                "flavor_accords_or_vibes": [t for t, _ in fav_tags.most_common(6)],
+            },
+        }
+        if remembered_preferences:
+            taste_dna["remembered_personal_preferences"] = remembered_preferences
+
         return {
             "status": "success",
             "domain": dom,
@@ -531,13 +552,7 @@ class RecommendationService:
                     "Analyze their Taste DNA, execute live web searches to find fresh, exceptional candidates, "
                     "and STRICTLY avoid any item in the Negative Exclusion Catalog."
                 ),
-                "user_taste_dna": {
-                    "top_rated_anchors": top_anchors[:8],
-                    "dominant_affinities": {
-                        "creators_or_cuisines": [c for c, _ in fav_creators.most_common(5)],
-                        "flavor_accords_or_vibes": [t for t, _ in fav_tags.most_common(6)],
-                    },
-                },
+                "user_taste_dna": taste_dna,
                 "negative_exclusion_catalog": {
                     "instruction": "CRITICAL: Never recommend anything in this catalog. The user has already read, watched, visited, or tasted it.",
                     "total_excluded_items": len(excluded_items),
@@ -547,7 +562,7 @@ class RecommendationService:
                         for name in excluded_items
                     ],
                 },
-                "guardrails_and_dislikes": guardrails[:5],
+                "guardrails_and_dislikes": guardrails[:8],
                 "suggested_web_search_directives": web_queries,
                 "selection_rubric": [
                     "1. Uniqueness: Avoid cliché suggestions; discover hidden masterpieces, artisanal releases, or recent acclaimed debuts.",

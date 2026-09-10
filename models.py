@@ -297,3 +297,69 @@ class RestaurantModel(BaseModel):
         if not data.get("updated_at"):
             data["updated_at"] = datetime.now(timezone.utc)
         return data
+
+
+# ============================================================================
+# LONG-TERM PERSONAL MEMORY & AMBIENT CONTEXT MODELS
+# ============================================================================
+
+class MemoryCategory(str, Enum):
+    """Categorization for long-term personal memories, quirks, and directives."""
+    PREFERENCE = "preference"      # General tastes (e.g. "Prefers intimate omakase counter seating")
+    DISLIKE = "dislike"            # Strict dislikes/guardrails (e.g. "Dislikes jump-scares and 3D movies")
+    GOAL = "goal"                  # Current goals (e.g. "Aiming to read 24 books in 2026")
+    HABIT = "habit"                # Routine or pattern (e.g. "Reads late at night, drinks pour-over in morning")
+    CONTEXT = "context"            # Temporary or life context (e.g. "Traveling to Tokyo in October 2026")
+    DIRECTIVE = "directive"        # Permanent instructions (e.g. "Always suggest 2 book alternatives")
+
+
+class MemoryModel(BaseModel):
+    """
+    Schema for personal memories, constraints, and ambient directives in 'personal_memory'.
+    """
+    id: str = Field(..., description="Unique Memory ID (e.g. mem_pref_a1b2c3)")
+    category: str = Field(
+        default="preference",
+        description="Memory category: preference, dislike, goal, habit, context, directive"
+    )
+    content: str = Field(..., description="The concrete memory, fact, preference, or instruction to retain")
+    tags: List[str] = Field(default_factory=list, description="Descriptive tags for indexing and search")
+    importance: int = Field(
+        default=3,
+        ge=1,
+        le=5,
+        description="Importance level from 1 (minor quirk) to 5 (critical hard directive)"
+    )
+    source: str = Field(
+        default="user_explicit",
+        description="Source of memory: user_explicit, conversation_observation"
+    )
+    created_at: Optional[datetime] = Field(default=None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(default=None, description="Last update timestamp")
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, v: str) -> str:
+        v_clean = v.strip().lower()
+        valid = {c.value for c in MemoryCategory}
+        if v_clean in valid:
+            return v_clean
+        if "dislike" in v_clean or "avoid" in v_clean or "hate" in v_clean:
+            return "dislike"
+        if "goal" in v_clean or "aim" in v_clean or "target" in v_clean:
+            return "goal"
+        if "habit" in v_clean or "routine" in v_clean:
+            return "habit"
+        if "direct" in v_clean or "rule" in v_clean or "instruct" in v_clean:
+            return "directive"
+        if "context" in v_clean or "trip" in v_clean or "travel" in v_clean or "life" in v_clean:
+            return "context"
+        return "preference"
+
+    def to_firestore_dict(self) -> dict:
+        data = self.model_dump()
+        now = datetime.now(timezone.utc)
+        if not data.get("created_at"):
+            data["created_at"] = now
+        data["updated_at"] = now
+        return data

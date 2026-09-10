@@ -22,6 +22,7 @@ from services import (
     PodcastService,
     SensoryService,
     RestaurantService,
+    MemoryService,
     RecommendationService,
     PairingService,
     BookMetadataClient,
@@ -40,6 +41,7 @@ quote_service = QuoteService()
 podcast_service = PodcastService()
 sensory_service = SensoryService()
 restaurant_service = RestaurantService()
+memory_service = MemoryService()
 
 books_client = BookMetadataClient()
 tmdb_client = TMDBClient()
@@ -55,6 +57,7 @@ recommendation_service = RecommendationService(
     podcast_service=podcast_service,
     sensory_service=sensory_service,
     restaurant_service=restaurant_service,
+    memory_service=memory_service,
 )
 
 pairing_service = PairingService(
@@ -157,6 +160,15 @@ def get_taste_dna_dossier() -> str:
         f"**Top Artisans & Distilleries**: {', '.join(sensory.get('favorite_makers_or_distilleries', [])[:5])}",
     ]
     return "\n".join(lines)
+
+
+@mcp.resource("curator://context/personal_memory")
+def get_personal_memory_context() -> str:
+    """
+    Live background context resource providing Claude Desktop with your active
+    long-term personal memories, critical directives, habits, and constraints.
+    """
+    return memory_service.get_personal_memory_summary()
 
 
 # ============================================================================
@@ -266,6 +278,7 @@ def get_entertainment_stats() -> Dict[str, Any]:
         "podcasts": podcast_service.get_stats(),
         "sensory_vault": sensory_service.get_stats(),
         "restaurants": restaurant_service.get_stats(),
+        "memories": memory_service.get_stats(),
     }
 
 
@@ -1114,6 +1127,88 @@ def get_dining_course_pairing(
         dish_or_cuisine=dish_or_cuisine,
         dining_style=dining_style,
     )
+
+
+# ============================================================================
+# 9. LONG-TERM PERSONAL MEMORY & AMBIENT DIRECTIVES
+# ============================================================================
+
+@mcp.tool()
+def store_memory(
+    content: str,
+    category: str = "preference",
+    tags: Optional[List[str]] = None,
+    importance: int = 3,
+) -> Dict[str, Any]:
+    """
+    Store or update a personal memory, preference, habit, life context, or directive.
+    Call this tool autonomously when the user shares personal constraints, quirks, or facts
+    that should persist across future conversations.
+
+    Args:
+        content: The fact, preference, or directive to remember (e.g. 'I get migraines from 3D movies').
+        category: 'preference', 'dislike', 'goal', 'habit', 'context', or 'directive'.
+        tags: Optional list of topic keywords for indexing (e.g. ['cinema', 'health']).
+        importance: 1 (minor quirk) to 5 (critical hard directive).
+    """
+    return memory_service.store(
+        content=content,
+        category=category,
+        tags=tags,
+        importance=importance,
+        source="user_explicit",
+    )
+
+
+@mcp.tool()
+def recall_memories(
+    query: Optional[str] = None,
+    category: Optional[str] = None,
+    min_importance: int = 1,
+    limit: int = 10,
+) -> Dict[str, Any]:
+    """
+    Retrieve stored personal memories, habits, and directives matching a query or category.
+
+    Args:
+        query: Optional keyword or topic (e.g. 'coffee', 'tokyo', 'travel', 'books').
+        category: Optional category filter ('preference', 'dislike', 'goal', 'habit', 'context', 'directive').
+        min_importance: Filter out memories below this importance threshold (1-5).
+        limit: Max results to return.
+    """
+    results = memory_service.recall(
+        query=query,
+        category=category,
+        min_importance=min_importance,
+        limit=limit,
+    )
+    return {
+        "status": "success",
+        "query": query,
+        "category": category,
+        "total_matches": len(results),
+        "memories": results,
+    }
+
+
+@mcp.tool()
+def forget_memory(memory_id: str) -> Dict[str, Any]:
+    """
+    Delete an outdated, obsolete, or retracted personal memory by ID.
+
+    Args:
+        memory_id: Unique memory ID (e.g. 'mem_pref_a1b2c3').
+    """
+    return memory_service.forget(memory_id=memory_id)
+
+
+@mcp.tool()
+def get_memory_stats() -> Dict[str, Any]:
+    """
+    Get summary statistics of the user's personal memory vault:
+    total memories, high-importance directives count, breakdown by category, and top tags.
+    """
+    return memory_service.get_stats()
 
 
 # ============================================================================

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![FastMCP](https://img.shields.io/badge/MCP-FastMCP-brightgreen.svg)](https://github.com/jlowin/fastmcp)
 [![Google Cloud Firestore](https://img.shields.io/badge/Database-Firestore-orange.svg)](https://cloud.google.com/firestore)
-[![Tests: 60 Passing](https://img.shields.io/badge/tests-60%20passing-success.svg)](#-testing--quality-assurance)
+[![Tests: 67 Passing](https://img.shields.io/badge/tests-67%20passing-success.svg)](#-testing--quality-assurance)
 
 A production-grade **Model Context Protocol (MCP)** server and automated data ingestion pipeline that transforms **Google Cloud Firestore** into your private, intelligent entertainment memory, literature companion, knowledge vault, fine dining guide, and connoisseur taste curator.
 
@@ -17,7 +17,8 @@ Connects natively to **Gemini**, **Claude Desktop**, **Antigravity IDE**, and ot
 6. **Fine Dining & Restaurants**: Gastronomy journal, city guides, Michelin distinctions, signature dishes, and reservation wishlists.
 7. **AI-Agent Empowered Recommendations**: Supplies the calling LLM agent with deep personal Taste DNA, strict Negative Exclusion Catalogs, real-time web search directives, and candidate vetting for zero-collision discoveries.
 8. **Multimodal Sensory Pairings**: Cross-domain aesthetic pairings bridging books and films with beverages, ambient fragrances, chocolates, and sonic atmospheres.
-9. **Claude Desktop Native Prompts & Resources**: Zero-click background context (`curator://context/...`) and 1-click `/` slash commands (`/daily-briefing`, `/tasting-session`, `/weekend-curation`, `/smart-recommendation-consultation`).
+9. **Persistent Long-Term Memory Vault**: Autonomous cross-session retention of personal quirks, habits, dietary/sensory preferences, goals, and critical directives, with deduplication and ambient context injection.
+10. **Claude Desktop Native Prompts & Resources**: Zero-click background context (`curator://context/...`) and 1-click `/` slash commands (`/daily-briefing`, `/tasting-session`, `/weekend-curation`, `/smart-recommendation-consultation`).
 
 ---
 
@@ -199,15 +200,16 @@ python -m importers.imdb_importer --watchlist path/to/watchlist.csv
 
 ## 🛠️ Model Context Protocol (MCP) Tools
 
-The server registers **45 specialized tools**, **4 native context resources**, and **4 interactive prompts** categorized across eight domains:
+The server registers **49 specialized tools**, **5 native context resources**, and **4 interactive prompts** categorized across ten domains:
 
 ### 0. Claude Desktop Context Resources & 1-Click Prompts
 | Feature Type | Identifier / URI | Description |
 |---|---|---|
-| **Resource** | `curator://context/taste_profile` | Live background context: user's top genres, directors, authors, flavor accords, and favorite cuisines. |
+| **Resource** | `curator://context/personal_memory` | Live ambient memory context: critical directives, dietary/sensory constraints, active goals, and lifestyle habits. |
+| **Resource** | `curator://context/taste_dna_dossier` | Machine-readable Taste DNA dossier (Cultural Archetype, top creators, sensory accords). |
 | **Resource** | `curator://context/active_queues` | Live background context: currently-reading books, movie watchlist, and podcast queue. |
 | **Resource** | `curator://context/daily_digest` | Morning briefing: Quote of the Day, reading progress, and vault summary metrics. |
-| **Resource** | `curator://context/taste_dna_dossier` | Machine-readable Taste DNA dossier (Cultural Archetype, top creators, sensory accords). |
+| **Resource** | `curator://context/taste_profile` | Live background context: user's top genres, directors, authors, flavor accords, and favorite cuisines. |
 | **Prompt** | `/daily-briefing` | 1-click morning briefing prompt synthesizing thoughts for the day and evening cultural picks. |
 | **Prompt** | `/tasting-session` | Master Sommelier / Barista / Perfumer interactive tasting interview to evaluate and log items. |
 | **Prompt** | `/weekend-curation` | Complete curated weekend plan (film pick + wine/tea pairing + book reading + dinner). |
@@ -290,6 +292,14 @@ The server registers **45 specialized tools**, **4 native context resources**, a
 |---|---|---|
 | `get_aesthetic_pairing` | `anchor_type`, `title_or_name`, `author_or_creator`, `mood` | Cross-domain pairing matching books/films with beverages, fragrances, chocolates, and music. |
 | `get_dining_course_pairing` | `dish_or_cuisine`, `dining_style` | Beverage and cellar pairing (fine wine, cocktail, tea) tailored to a culinary dish. |
+
+### 9. Persistent Long-Term Memory & Ambient Directives
+| Tool Name | Parameters | Description |
+|---|---|---|
+| `store_memory` | `content`, `category`, `tags`, `importance` | Autonomously store personal facts, preferences, quirks, habits, or critical directives. |
+| `recall_memories` | `query`, `category`, `min_importance`, `limit` | Search and retrieve remembered user facts and directives matching topic or category. |
+| `forget_memory` | `memory_id` | Delete an obsolete or retracted personal memory by ID. |
+| `get_memory_stats` | *none* | Breakdown of stored memories by category and high-importance directives count. |
 
 ---
 
@@ -543,6 +553,18 @@ Once Curator MCP is connected to **Claude Desktop**, you can interact naturally 
   - 👉 **Workflow**: AI agent calls `get_agent_recommendation_brief(domain='restaurants', target_location='Tokyo', mood_or_intent='counter seating and natural wine')`, searches recent restaurant openings, and screens against visited places.
 - *"Give me a summary of my dining statistics: cities explored, top cuisines, and Michelin breakdown."*
   - 👉 **Tool called**: `get_dining_stats`
+
+### 11. 🧠 Persistent Long-Term Memory & Ambient Directives
+- *"Remember that I get severe migraines from 3D movies and dislike jump-scare horror."*
+  - 👉 **Tool called**: `store_memory(content='Gets severe migraines from 3D movies and dislikes jump-scare horror', category='dislike', tags=['cinema', 'health'], importance=5)`
+- *"Remember that I am traveling to Tokyo and Kyoto for two weeks in October 2026."*
+  - 👉 **Tool called**: `store_memory(content='Traveling to Tokyo and Kyoto for two weeks in October 2026', category='context', tags=['travel', 'japan'], importance=4)`
+- *"Remember that I prefer light-roast washed Ethiopian coffees and clean natural wines."*
+  - 👉 **Tool called**: `store_memory(content='Prefers light-roast washed Ethiopian coffees and clean natural wines', category='preference', tags=['coffee', 'wine'], importance=3)`
+- *"What personal preferences or travel contexts have you remembered about me?"*
+  - 👉 **Tool called**: `recall_memories()` (or attach `curator://context/personal_memory` via paperclip / `@` menu)
+- *"Forget the note about my travel to Kyoto since my trip got cancelled."*
+  - 👉 **Tool called**: `forget_memory(memory_id='mem_contex_...')`
 
 ---
 

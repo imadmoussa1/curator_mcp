@@ -9,6 +9,7 @@ from services.quote_service import QuoteService
 from services.podcast_service import PodcastService
 from services.restaurant_service import RestaurantService
 from services.sensory_service import SensoryService
+from services.memory_service import MemoryService
 from services.recommendation_service import RecommendationService
 from services.pairing_service import PairingService
 
@@ -37,6 +38,7 @@ __all__ = [
     "PodcastService",
     "RestaurantService",
     "SensoryService",
+    "MemoryService",
     "RecommendationService",
     "PairingService",
     "BaseConnoisseurService",
