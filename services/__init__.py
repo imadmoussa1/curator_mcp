@@ -10,6 +10,7 @@ from services.podcast_service import PodcastService
 from services.restaurant_service import RestaurantService
 from services.sensory_service import SensoryService
 from services.recommendation_service import RecommendationService
+from services.pairing_service import PairingService
 
 from services.connoisseur import (
     BaseConnoisseurService,
@@ -37,6 +38,7 @@ __all__ = [
     "RestaurantService",
     "SensoryService",
     "RecommendationService",
+    "PairingService",
     "BaseConnoisseurService",
     "WhiskeyService",
     "WineService",

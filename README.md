@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![FastMCP](https://img.shields.io/badge/MCP-FastMCP-brightgreen.svg)](https://github.com/jlowin/fastmcp)
 [![Google Cloud Firestore](https://img.shields.io/badge/Database-Firestore-orange.svg)](https://cloud.google.com/firestore)
-[![Tests: 45 Passing](https://img.shields.io/badge/tests-45%20passing-success.svg)](#-testing--quality-assurance)
+[![Tests: 53 Passing](https://img.shields.io/badge/tests-53%20passing-success.svg)](#-testing--quality-assurance)
 
 A production-grade **Model Context Protocol (MCP)** server and automated data ingestion pipeline that transforms **Google Cloud Firestore** into your private, intelligent entertainment memory, literature companion, knowledge vault, fine dining guide, and connoisseur taste curator.
 
@@ -16,6 +16,8 @@ Connects natively to **Gemini**, **Claude Desktop**, **Antigravity IDE**, and ot
 5. **Sensory Vault**: Connoisseur tasting logs for **Tea, Whiskey, Coffee, Gin, Wine, Chocolate, Perfume, and Watches** with flavor wheel accords and domain specs.
 6. **Fine Dining & Restaurants**: Gastronomy journal, city guides, Michelin distinctions, signature dishes, and reservation wishlists.
 7. **Taste Profiling & Smart Recommendations**: Synthesizes ratings across books, films, sensory goods, and restaurants to recommend new gems while strictly filtering out items already consumed or queued.
+8. **Multimodal Sensory Pairings**: Cross-domain aesthetic pairings bridging books and films with beverages, ambient fragrances, chocolates, and sonic atmospheres.
+9. **Claude Desktop Native Prompts & Resources**: Zero-click background context (`curator://context/...`) and 1-click `/` slash commands (`/daily-briefing`, `/tasting-session`, `/weekend-curation`).
 
 ---
 
@@ -196,7 +198,17 @@ python -m importers.imdb_importer --watchlist path/to/watchlist.csv
 
 ## 🛠️ Model Context Protocol (MCP) Tools
 
-The server registers **41 specialized tools** categorized across seven domains:
+The server registers **43 specialized tools**, **3 native context resources**, and **3 interactive prompts** categorized across eight domains:
+
+### 0. Claude Desktop Context Resources & 1-Click Prompts
+| Feature Type | Identifier / URI | Description |
+|---|---|---|
+| **Resource** | `curator://context/taste_profile` | Live background context: user's top genres, directors, authors, flavor accords, and favorite cuisines. |
+| **Resource** | `curator://context/active_queues` | Live background context: currently-reading books, movie watchlist, and podcast queue. |
+| **Resource** | `curator://context/daily_digest` | Morning briefing: Quote of the Day, reading progress, and vault summary metrics. |
+| **Prompt** | `/daily-briefing` | 1-click morning briefing prompt synthesizing thoughts for the day and evening cultural picks. |
+| **Prompt** | `/tasting-session` | Master Sommelier / Barista / Perfumer interactive tasting interview to evaluate and log items. |
+| **Prompt** | `/weekend-curation` | Complete curated weekend plan (film pick + wine/tea pairing + book reading + dinner). |
 
 ### 1. Taste Profile, Curate My Night & Annual Wrapped
 | Tool Name | Parameters | Description |
@@ -269,6 +281,12 @@ The server registers **41 specialized tools** categorized across seven domains:
 | `search_restaurants` | `query`, `city`, `cuisine`, `status`, `vibe`, `min_rating`, `limit` | Query dining history and wishlists by city, cuisine, vibe tag, or rating. |
 | `get_dining_stats` | *none* | Summary of places visited, cities explored, top cuisines, and Michelin star breakdown. |
 | `get_restaurant_recommendations` | `city`, `vibe`, `cuisine`, `limit` | Curated dining recommendations in top food capitals matching your preferred vibes. |
+
+### 8. Multimodal Sensory & Cultural Pairings
+| Tool Name | Parameters | Description |
+|---|---|---|
+| `get_aesthetic_pairing` | `anchor_type`, `title_or_name`, `author_or_creator`, `mood` | Cross-domain pairing matching books/films with beverages, fragrances, chocolates, and music. |
+| `get_dining_course_pairing` | `dish_or_cuisine`, `dining_style` | Beverage and cellar pairing (fine wine, cocktail, tea) tailored to a culinary dish. |
 
 ---
 

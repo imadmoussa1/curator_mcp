@@ -23,6 +23,7 @@ from services import (
     SensoryService,
     RestaurantService,
     RecommendationService,
+    PairingService,
     BookMetadataClient,
     TMDBClient,
     ApplePodcastsClient,
@@ -55,6 +56,145 @@ recommendation_service = RecommendationService(
     sensory_service=sensory_service,
     restaurant_service=restaurant_service,
 )
+
+pairing_service = PairingService(
+    book_service=book_service,
+    media_service=media_service,
+    sensory_service=sensory_service,
+    restaurant_service=restaurant_service,
+)
+
+
+# ============================================================================
+# 0. CLAUDE DESKTOP NATIVE CONTEXT RESOURCES (@mcp.resource)
+# ============================================================================
+
+@mcp.resource("curator://context/taste_profile")
+def get_taste_profile_context() -> str:
+    """
+    Live background context resource providing Claude Desktop with the user's
+    taste preferences, 5-star books, 10/10 films, sensory flavor notes, and favorite cuisines.
+    """
+    profile = recommendation_service.get_taste_profile()
+    sensory_profile = recommendation_service.get_sensory_taste_profile()
+    dining_stats = restaurant_service.get_stats()
+
+    summary_lines = [
+        "# User Cultural & Taste Profile (Curator MCP)",
+        f"**Top Genres**: {', '.join(profile.get('taste_summary', {}).get('top_genres', []))}",
+        f"**Top Directors**: {', '.join(profile.get('taste_summary', {}).get('top_directors', []))}",
+        f"**Top Authors**: {', '.join(profile.get('taste_summary', {}).get('top_authors', []))}",
+        f"**Top Flavor & Scent Accords**: {', '.join(sensory_profile.get('top_flavor_and_scent_accords', []))}",
+        f"**Favorite Dining Cuisines**: {', '.join(dining_stats.get('top_cuisines', []))}",
+        f"**Favorite Dining Cities**: {', '.join(dining_stats.get('top_cities', []))}",
+    ]
+    return "\n".join(summary_lines)
+
+
+@mcp.resource("curator://context/active_queues")
+def get_active_queues_context() -> str:
+    """
+    Live background context resource providing Claude Desktop with currently reading books,
+    movie watchlist items, and podcast queue.
+    """
+    reading_now = book_service.get_reading_list(shelf="currently-reading", limit=5)
+    to_read = book_service.get_reading_list(shelf="to-read", limit=5)
+    watchlist = media_service.get_watchlist(limit=5)
+    pod_queue = podcast_service.get_queue(limit=5)
+
+    lines = ["# Active Queues & Currently Consuming (Curator MCP)"]
+    if reading_now:
+        lines.append(f"**Currently Reading**: {', '.join([b.get('title') for b in reading_now])}")
+    if to_read:
+        lines.append(f"**Up Next on Bookshelf**: {', '.join([b.get('title') for b in to_read])}")
+    if watchlist:
+        lines.append(f"**Movie Watchlist**: {', '.join([m.get('title') for m in watchlist])}")
+    if pod_queue:
+        lines.append(f"**Podcast Queue**: {', '.join([p.get('episode_title') for p in pod_queue])}")
+    return "\n".join(lines)
+
+
+@mcp.resource("curator://context/daily_digest")
+def get_daily_digest_context() -> str:
+    """
+    Live background context resource providing a morning brief: Quote of the Day,
+    active reading goal, and summary statistics.
+    """
+    quote = quote_service.get_random()
+    stats = {
+        "books": book_service.get_stats(),
+        "media": media_service.get_stats(),
+        "vault": sensory_service.get_stats(),
+        "restaurants": restaurant_service.get_stats(),
+    }
+    lines = [
+        "# Daily Curator Digest",
+        f"**Quote of the Day**: \"{quote.get('quote_text', 'Live deliberately.')}\" — {quote.get('speaker_or_author', 'Unknown')} (*{quote.get('source_title', 'Curator')}*)",
+        f"**Total Books Tracked**: {stats['books'].get('total_books', 0)} ({stats['books'].get('read', 0)} completed)",
+        f"**Total Media Watched**: {stats['media'].get('watched', 0)} ({stats['media'].get('watchlist', 0)} in watchlist)",
+        f"**Sensory Vault Items**: {stats['vault'].get('total_items', 0)} items",
+        f"**Restaurants Cataloged**: {stats['restaurants'].get('total_places', 0)} places",
+    ]
+    return "\n".join(lines)
+
+
+# ============================================================================
+# 0.5 CLAUDE DESKTOP 1-CLICK PROMPTS (@mcp.prompt)
+# ============================================================================
+
+@mcp.prompt("daily_briefing")
+def daily_briefing() -> str:
+    """
+    Generate an inspiring morning intellectual briefing for Claude Desktop.
+    Claude will synthesize your active reading status, quote of the day,
+    and suggest an evening cultural or culinary recommendation.
+    """
+    return (
+        "You are the user's personal Taste & Cultural Intelligence Curator. "
+        "Review their active queues, current book progress, and quote of the day. "
+        "Provide a concise, elegant morning briefing structured as:\n"
+        "1. 💡 Thought for the Day (reflect on their Quote of the Day)\n"
+        "2. 📖 Reading & Intellectual Focus (mention what they are currently reading)\n"
+        "3. 🎬 Evening Wind-Down Recommendation (pick an ideal film from their watchlist or an aesthetic beverage pairing)\n"
+        "Keep the tone sophisticated, encouraging, and clear."
+    )
+
+
+@mcp.prompt("tasting_session")
+def tasting_session(category: str = "whiskey", item_name: str = "") -> str:
+    """
+    Interactive sensory tasting interview where Claude acts as a Master Sommelier,
+    Barista, Perfumer, or Horologist to log an artisanal item with precise specs.
+    """
+    item_str = f" for '{item_name}'" if item_name else ""
+    return (
+        f"You are conducting a Master Tasting & Evaluation Session in the domain of '{category}'{item_str}. "
+        "Act as a world-class connoisseur and guide the user through a sensory evaluation:\n"
+        "1. Appearance / Origin / Provenance check\n"
+        "2. Aroma / Nose (top notes, primary accords, subtlety)\n"
+        "3. Palate / Taste profile (texture, acidity/tannin/sweetness/peat)\n"
+        "4. Finish / Longevity & Final Rating (1.0 to 10.0 scale)\n"
+        "Ask questions one step at a time or invite them to share their impressions, "
+        "then offer to log the completed evaluation directly into their Sensory Vault via `log_sensory_item`."
+    )
+
+
+@mcp.prompt("weekend_curation")
+def weekend_curation(mood: Optional[str] = None) -> str:
+    """
+    Prompts Claude to curate an entire weekend cultural itinerary
+    (Movie from watchlist + Wine/Spirit/Tea pairing + Book chapter + Dining spot).
+    """
+    mood_str = f" with a '{mood}' aesthetic" if mood else ""
+    return (
+        f"Curate a complete, luxurious weekend cultural and culinary itinerary{mood_str}. "
+        "Leverage the tools in Curator MCP to select:\n"
+        "1. 🍿 Cinema Pick: A movie from their watchlist matching their free time and mood\n"
+        "2. 🍷 Beverage / Sensory Pairing: A wine, tea, or craft cocktail that pairs with the movie\n"
+        "3. 📚 Reading Session: A recommended time and book from their reading list\n"
+        "4. 🍽️ Dining Experience: A restaurant from their dining wishlist or a curated neighborhood gem\n"
+        "Present the plan with evocative descriptions and explain why each element complements the other."
+    )
 
 
 # ============================================================================
@@ -886,6 +1026,64 @@ def get_restaurant_recommendations(
         vibe=vibe,
         cuisine=cuisine,
         limit=limit,
+    )
+
+
+# ============================================================================
+# 8. MULTIMODAL SENSORY & CULTURAL PAIRINGS
+# ============================================================================
+
+@mcp.tool()
+def get_aesthetic_pairing(
+    anchor_type: str,
+    title_or_name: str,
+    author_or_creator: Optional[str] = None,
+    mood: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Generate an aesthetic cross-domain multimodal pairing connecting literature or cinema
+    with sensory connoisseur goods (tea, coffee, single malt, wine, chocolate, fragrance, sonic vibe).
+
+    Args:
+        anchor_type: 'book' or 'movie' / 'media'
+        title_or_name: Title of the book or movie (e.g. 'Dune', 'Norwegian Wood', 'Blade Runner 2049')
+        author_or_creator: Optional author name or film director
+        mood: Optional vibe constraint (e.g. 'rainy day', 'cyberpunk', 'zen', 'dark noir', 'classical')
+
+    Returns:
+        Curated beverage pairing with rationale, matching items in your owned cellar/cabinet,
+        olfactory fragrance accord, single-origin chocolate pairing, and acoustic sonic ambiance.
+    """
+    a_type = anchor_type.lower().strip()
+    if "book" in a_type:
+        return pairing_service.get_pairing_for_book(
+            title=title_or_name,
+            author=author_or_creator,
+            mood=mood,
+        )
+    return pairing_service.get_pairing_for_media(
+        title=title_or_name,
+        media_type="movie",
+        mood=mood,
+    )
+
+
+@mcp.tool()
+def get_dining_course_pairing(
+    dish_or_cuisine: str,
+    dining_style: Optional[str] = "dinner",
+) -> Dict[str, Any]:
+    """
+    Generate a beverage or cellar pairing (fine wine, craft cocktail, or cold-brew tea)
+    tailored to a specific culinary dish or restaurant course.
+
+    Args:
+        dish_or_cuisine: Dish name or cuisine style (e.g. 'Omakase Nigiri', 'Dry-Aged Wagyu Ribeye', 'Truffle Tagliolini')
+        dining_style: 'dinner', 'lunch', 'tasting_menu', or 'casual'
+    """
+    return pairing_service.get_pairing_for_dish(
+        dish_or_cuisine=dish_or_cuisine,
+        dining_style=dining_style,
     )
 
 
