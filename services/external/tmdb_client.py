@@ -5,6 +5,7 @@ The Movie Database (TMDB) API client for movie and series discovery.
 from typing import Optional, List, Dict, Any
 import requests
 from config import TMDB_API_KEY
+from services.token_utils import compact_text
 
 
 class TMDBClient:
@@ -66,19 +67,15 @@ class TMDBClient:
             media_name = item.get("title") or item.get("name")
             release_date = item.get("release_date") or item.get("first_air_date", "")
             poster = item.get("poster_path")
-            poster_url = f"https://image.tmdb.org/t/p/w500{poster}" if poster else ""
-            genres = [self.GENRE_MAP.get(gid, "Other") for gid in item.get("genre_ids", [])]
-
+            overview = item.get("overview", "")
             results.append({
                 "tmdb_id": item.get("id"),
                 "title": media_name,
                 "media_type": "movie" if "movie" in media_type.lower() else "tv",
                 "release_date": release_date,
-                "overview": item.get("overview", ""),
+                "overview": compact_text(overview, 140),
                 "vote_average": item.get("vote_average"),
-                "vote_count": item.get("vote_count"),
-                "genres": genres,
-                "poster_url": poster_url,
+                "genres": genres[:3],
             })
         return results
 

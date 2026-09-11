@@ -18,6 +18,11 @@ PORT = int(os.getenv("PORT", "8000"))
 TMDB_API_KEY = os.getenv("TMDB_API_KEY", "")
 GOOGLE_BOOKS_API_KEY = os.getenv("GOOGLE_BOOKS_API_KEY", "")
 
+# Token Optimization & Client Footprint Settings
+CURATOR_SLIM_MODE = os.getenv("CURATOR_SLIM_MODE", "true").lower() in ("true", "1", "yes")
+CURATOR_COMPACT_OUTPUTS = os.getenv("CURATOR_COMPACT_OUTPUTS", "true").lower() in ("true", "1", "yes")
+CURATOR_DEFAULT_LIMIT = int(os.getenv("CURATOR_DEFAULT_LIMIT", "5"))
+
 _db = None
 
 

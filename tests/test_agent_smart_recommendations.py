@@ -3,7 +3,7 @@ Unit tests for AI Agent Smart Recommendation Briefing, Candidate Vetting, and MC
 """
 
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from services.recommendation_service import RecommendationService
 from mcp_server import (
@@ -124,7 +124,18 @@ class TestAgentSmartRecommendations(unittest.TestCase):
         self.assertIn("%", res["taste_affinity_score"])
         self.assertTrue(len(res["personalization_tethers"]) > 0)
 
-    def test_mcp_presentation_layer(self):
+    @patch("mcp_server.memory_service.get_relevant_constraints")
+    @patch("mcp_server.memory_service.recall")
+    @patch("mcp_server.sensory_service.stream_all")
+    @patch("mcp_server.recommendation_service.generate_cultural_wrapped")
+    @patch("mcp_server.recommendation_service.get_taste_profile")
+    def test_mcp_presentation_layer(self, mock_taste, mock_wrapped, mock_stream, mock_recall, mock_constraints):
+        mock_stream.return_value = []
+        mock_recall.return_value = []
+        mock_constraints.return_value = []
+        mock_wrapped.return_value = {"cultural_archetype": {"title": "The Polymath", "summary": "Diverse appetite"}}
+        mock_taste.return_value = {"taste_summary": {"top_authors": ["Gibson"], "top_directors": ["Villeneuve"], "top_genres": ["Sci-Fi"]}}
+
         # Test FastMCP prompt
         prompt = smart_recommendation_consultation(domain="movies", mood_or_craving="dystopian slow-burn")
         self.assertIn("get_agent_recommendation_brief", prompt)

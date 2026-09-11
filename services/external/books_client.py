@@ -5,6 +5,7 @@ Book metadata client utilizing Google Books API with automatic Open Library fall
 from typing import Optional, List, Dict, Any
 import requests
 from config import GOOGLE_BOOKS_API_KEY
+from services.token_utils import compact_text
 
 
 class OpenLibraryClient:
@@ -101,7 +102,7 @@ class BookMetadataClient:
         results = []
         for item in items:
             vol = item.get("volumeInfo", {})
-            images = vol.get("imageLinks", {})
+            desc = vol.get("description", "")
             results.append({
                 "source": "google_books",
                 "google_book_id": item.get("id"),
@@ -109,13 +110,10 @@ class BookMetadataClient:
                 "subtitle": vol.get("subtitle", ""),
                 "authors": vol.get("authors", []),
                 "published_date": vol.get("publishedDate", ""),
-                "description": vol.get("description", ""),
-                "categories": vol.get("categories", []),
+                "description": compact_text(desc, 140),
+                "categories": vol.get("categories", [])[:2],
                 "page_count": vol.get("pageCount"),
                 "average_rating": vol.get("averageRating"),
-                "ratings_count": vol.get("ratingsCount"),
-                "thumbnail": images.get("thumbnail") or images.get("smallThumbnail", ""),
-                "info_link": vol.get("infoLink", ""),
             })
         return results
 

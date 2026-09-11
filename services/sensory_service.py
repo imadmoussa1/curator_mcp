@@ -9,6 +9,7 @@ from typing import Optional, List, Dict, Any
 from collections import Counter
 
 from services.base_repository import BaseFirestoreRepository
+from services.token_utils import compact_text
 from services.connoisseur import (
     BaseConnoisseurService,
     WhiskeyService,
@@ -152,11 +153,21 @@ class SensoryService(BaseFirestoreRepository):
         status: Optional[str] = None,
         min_rating: Optional[float] = None,
         tag: Optional[str] = None,
-        limit: int = 20,
+        limit: int = 5,
     ) -> List[Dict[str, Any]]:
         """
-        Search sensory vault items. If category is provided, delegates to that specific domain service.
-        Otherwise, aggregates search results across all items.
+        Search sensory vault items with optional category, rating, status, and tasting note filters.
+
+        Args:
+            query: Keyword string to match against name, brand/maker, origin, notes, or reviews.
+            category: Optional category filter ('whiskey', 'wine', 'coffee', 'tea', 'gin', 'chocolate', 'perfume', 'watch').
+            status: Optional ownership status ('owned', 'wishlist', 'experienced').
+            min_rating: Minimum user rating threshold (1.0 to 10.0).
+            tag: Specific flavor accord or aroma tag to match (e.g. 'peat', 'bergamot', 'jasmine').
+            limit: Maximum number of items to return. Defaults to 5.
+
+        Returns:
+            A list of dictionary records containing item attributes, tasting accords, and concise review summaries.
         """
         if category:
             sub_service = self._get_service_for_category(category)
@@ -193,7 +204,17 @@ class SensoryService(BaseFirestoreRepository):
                 if q_norm not in searchable:
                     continue
 
-            results.append(item)
+            results.append({
+                "id": item.get("id"),
+                "category": item.get("category"),
+                "name": item.get("name"),
+                "maker_or_brand": item.get("maker_or_brand"),
+                "origin_or_region": item.get("origin_or_region"),
+                "user_rating": item.get("user_rating"),
+                "status": item.get("status"),
+                "flavor_or_scent_notes": item.get("flavor_or_scent_notes", [])[:5],
+                "review": compact_text(item.get("review") or item.get("personal_notes"), 120),
+            })
             if len(results) >= limit:
                 break
 

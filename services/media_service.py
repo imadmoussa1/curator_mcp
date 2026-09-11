@@ -11,6 +11,7 @@ from collections import Counter
 from models import MediaModel
 from services.base_repository import BaseFirestoreRepository
 from services.external.tmdb_client import TMDBClient
+from services.token_utils import compact_text
 
 
 class MediaService(BaseFirestoreRepository):
@@ -130,14 +131,23 @@ class MediaService(BaseFirestoreRepository):
                     "status": m.get("status"),
                     "genres": m.get("genres", []),
                     "directors": m.get("directors", []),
-                    "notes": m.get("notes"),
+                    "notes": compact_text(m.get("notes"), 120),
                 })
                 if len(matches) >= limit:
                     break
         return matches
 
-    def get_recently_watched(self, limit: int = 10, media_type: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Retrieve most recently watched and rated movies or series, sorted by date rated descending."""
+    def get_recently_watched(self, limit: int = 5, media_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Retrieve the most recently watched and rated movies or series, sorted chronologically descending.
+
+        Args:
+            limit: Maximum number of records to return. Defaults to 5.
+            media_type: Optional filter by media category ('Movie', 'TV Series', etc.).
+
+        Returns:
+            A list of watched media records with ratings, completion dates, and concise notes.
+        """
         docs = self.filter_by("status", "==", "watched")
         items = []
         for m in docs:
@@ -156,7 +166,7 @@ class MediaService(BaseFirestoreRepository):
                 "date_rated": date_rated if date_rated != "1970-01-01" else None,
                 "genres": m.get("genres", []),
                 "directors": m.get("directors", []),
-                "notes": notes,
+                "notes": compact_text(notes, 120),
                 "_sort_date": date_rated,
             })
         items.sort(key=lambda x: x["_sort_date"], reverse=True)
@@ -168,9 +178,19 @@ class MediaService(BaseFirestoreRepository):
         self,
         media_type: Optional[str] = None,
         genre: Optional[str] = None,
-        limit: int = 20
+        limit: int = 8
     ) -> List[Dict[str, Any]]:
-        """Retrieve items from user's watchlist with optional genre or type filter."""
+        """
+        Retrieve items from the user's movie/series watchlist with optional genre or media type filtering.
+
+        Args:
+            media_type: Optional filter ('Movie', 'TV Series').
+            genre: Optional genre keyword (e.g. 'Sci-Fi', 'Thriller').
+            limit: Maximum number of records to return. Defaults to 8.
+
+        Returns:
+            A list of queued watchlist records formatted for recommendation agents.
+        """
         docs = self.filter_by("status", "==", "watchlist")
         results = []
         for m in docs:
@@ -187,7 +207,7 @@ class MediaService(BaseFirestoreRepository):
                 "imdb_rating": m.get("imdb_rating"),
                 "genres": genres,
                 "directors": m.get("directors", []),
-                "notes": m.get("notes"),
+                "notes": compact_text(m.get("notes"), 120),
             })
             if len(results) >= limit:
                 break

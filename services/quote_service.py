@@ -10,6 +10,7 @@ from typing import Optional, List, Dict, Any
 
 from models import QuoteModel
 from services.base_repository import BaseFirestoreRepository
+from services.token_utils import compact_text
 
 
 class QuoteService(BaseFirestoreRepository):
@@ -111,7 +112,7 @@ class QuoteService(BaseFirestoreRepository):
         query: str,
         theme: Optional[str] = None,
         source_title: Optional[str] = None,
-        limit: int = 10
+        limit: int = 5
     ) -> List[Dict[str, Any]]:
         """Search saved quotes by keywords, themes, author, or title."""
         q_norm = query.lower().strip()
@@ -132,11 +133,31 @@ class QuoteService(BaseFirestoreRepository):
             if title_norm and title_norm not in source:
                 continue
 
-            matches.append(q)
+            matches.append({
+                "id": q.get("id"),
+                "quote_text": q.get("quote_text"),
+                "speaker_or_author": q.get("speaker_or_author"),
+                "source_title": q.get("source_title"),
+                "source_type": q.get("source_type"),
+                "theme_tags": q.get("theme_tags", []),
+                "notes": compact_text(q.get("notes"), 120),
+            })
             if len(matches) >= limit:
                 break
         return matches
 
-    def list_favorites(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def list_favorites(self, limit: int = 5) -> List[Dict[str, Any]]:
         """Retrieve favorited quotes."""
-        return self.filter_by("favorite", "==", True, limit=limit)
+        docs = self.filter_by("favorite", "==", True, limit=limit)
+        return [
+            {
+                "id": q.get("id"),
+                "quote_text": q.get("quote_text"),
+                "speaker_or_author": q.get("speaker_or_author"),
+                "source_title": q.get("source_title"),
+                "source_type": q.get("source_type"),
+                "theme_tags": q.get("theme_tags", []),
+                "notes": compact_text(q.get("notes"), 120),
+            }
+            for q in docs
+        ]

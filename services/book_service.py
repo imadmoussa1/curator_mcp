@@ -10,6 +10,7 @@ from collections import Counter
 
 from models import BookModel
 from services.base_repository import BaseFirestoreRepository
+from services.token_utils import compact_text
 
 
 class BookService(BaseFirestoreRepository):
@@ -22,8 +23,18 @@ class BookService(BaseFirestoreRepository):
         slug = re.sub(r"[^a-zA-Z0-9]+", "_", f"{title}_{author}".lower()).strip("_")
         return f"gr_{slug[:25]}_{uuid.uuid4().hex[:6]}"
 
-    def search(self, query: str = "", shelf: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
-        """Search books by title or author keywords with optional shelf filter."""
+    def search(self, query: str = "", shelf: Optional[str] = None, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Search books in Firestore by title or author keywords with optional shelf filtering.
+
+        Args:
+            query: Keyword string to match against book titles or authors (case-insensitive).
+            shelf: Optional shelf filter ('read', 'currently-reading', or 'to-read').
+            limit: Maximum number of matched book records to return. Defaults to 5.
+
+        Returns:
+            A list of dictionary records containing book metadata and compacted note summaries.
+        """
         q_norm = query.strip().lower()
         matches = []
         docs = self.stream_all()
@@ -42,14 +53,22 @@ class BookService(BaseFirestoreRepository):
                     "avg_rating": b.get("avg_rating"),
                     "shelf": b.get("shelf"),
                     "date_read": b.get("date_read"),
-                    "notes": b.get("notes_and_reviews"),
+                    "notes": compact_text(b.get("notes_and_reviews"), 120),
                 })
                 if len(matches) >= limit:
                     break
         return matches
 
-    def get_recently_read(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Retrieve most recently finished and rated books, sorted by date read descending."""
+    def get_recently_read(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Retrieve the most recently completed and rated books, sorted chronologically descending.
+
+        Args:
+            limit: Maximum number of records to return. Defaults to 5.
+
+        Returns:
+            A list of completed book records with user ratings, read dates, and concise notes.
+        """
         docs = self.filter_by("shelf", "==", "read")
         items = []
         for b in docs:
@@ -62,7 +81,7 @@ class BookService(BaseFirestoreRepository):
                 "avg_rating": b.get("avg_rating"),
                 "shelf": b.get("shelf"),
                 "date_read": b.get("date_read"),
-                "notes": b.get("notes_and_reviews"),
+                "notes": compact_text(b.get("notes_and_reviews"), 120),
                 "_sort_date": d_read,
             })
         items.sort(key=lambda x: x["_sort_date"], reverse=True)
@@ -70,8 +89,17 @@ class BookService(BaseFirestoreRepository):
             it.pop("_sort_date", None)
         return items[:limit]
 
-    def get_reading_list(self, shelf: str = "to-read", limit: int = 20) -> List[Dict[str, Any]]:
-        """Retrieve books from user's reading queue ('to-read' or 'currently-reading')."""
+    def get_reading_list(self, shelf: str = "to-read", limit: int = 8) -> List[Dict[str, Any]]:
+        """
+        Retrieve books from the user's active reading queues ('to-read' or 'currently-reading').
+
+        Args:
+            shelf: Queue name ('to-read' or 'currently-reading'). Defaults to 'to-read'.
+            limit: Maximum number of records to return. Defaults to 8.
+
+        Returns:
+            A list of queued book records tailored for prompt consumption.
+        """
         docs = self.filter_by("shelf", "==", shelf.strip().lower(), limit=limit)
         return [
             {
@@ -80,7 +108,7 @@ class BookService(BaseFirestoreRepository):
                 "author": b.get("author"),
                 "avg_rating": b.get("avg_rating"),
                 "shelf": b.get("shelf"),
-                "notes": b.get("notes_and_reviews"),
+                "notes": compact_text(b.get("notes_and_reviews"), 120),
             }
             for b in docs
         ]

@@ -85,8 +85,14 @@ class RecommendationService:
                 "top_directors": [d for d, _ in director_counts.most_common(5)],
                 "top_authors": [a for a, _ in author_counts.most_common(5)],
             },
-            "favorite_books_sample": top_books[:10],
-            "favorite_media_sample": top_media[:10],
+            "favorite_books_sample": [
+                {"title": b.get("title"), "author": b.get("author"), "rating": f"{b.get('user_rating')}★"}
+                for b in top_books[:4]
+            ],
+            "favorite_media_sample": [
+                {"title": m.get("title"), "year": m.get("year"), "rating": f"{m.get('user_rating')}/10"}
+                for m in top_media[:4]
+            ],
             "total_highly_rated_books": len(top_books),
             "total_highly_rated_media": len(top_media),
         }
@@ -533,41 +539,35 @@ class RecommendationService:
             ]
 
         taste_dna: Dict[str, Any] = {
-            "top_rated_anchors": top_anchors[:8],
+            "top_rated_anchors": top_anchors[:4],
             "dominant_affinities": {
-                "creators_or_cuisines": [c for c, _ in fav_creators.most_common(5)],
-                "flavor_accords_or_vibes": [t for t, _ in fav_tags.most_common(6)],
+                "creators_or_cuisines": [c for c, _ in fav_creators.most_common(4)],
+                "flavor_accords_or_vibes": [t for t, _ in fav_tags.most_common(5)],
             },
         }
         if remembered_preferences:
-            taste_dna["remembered_personal_preferences"] = remembered_preferences
+            taste_dna["remembered_personal_preferences"] = remembered_preferences[:3]
 
         return {
             "status": "success",
             "domain": dom,
             "briefing_for_ai_agent": {
                 "role_directive": (
-                    f"You are the user's bespoke taste curator with internet search access. "
-                    f"The user is seeking an elite recommendation in '{dom}'{mood_str}{loc_str}. "
-                    "Analyze their Taste DNA, execute live web searches to find fresh, exceptional candidates, "
-                    "and STRICTLY avoid any item in the Negative Exclusion Catalog."
+                    f"Curate an elite recommendation in '{dom}'{mood_str}{loc_str}. "
+                    "Analyze Taste DNA, search the web for fresh/obscure gems, and avoid the Negative Exclusion Catalog."
                 ),
                 "user_taste_dna": taste_dna,
                 "negative_exclusion_catalog": {
-                    "instruction": "CRITICAL: Never recommend anything in this catalog. The user has already read, watched, visited, or tasted it.",
+                    "instruction": "Do not recommend items in this catalog (already consumed). Call vet_recommendation_candidate to verify candidates.",
                     "total_excluded_items": len(excluded_items),
-                    "sample_excluded_titles": excluded_items[:60],
-                    "all_excluded_names_normalized": [
-                        re.sub(r"[^\w\s]", "", str(name).lower()).strip()
-                        for name in excluded_items
-                    ],
+                    "sample_excluded_titles": excluded_items[:15],
                 },
-                "guardrails_and_dislikes": guardrails[:8],
-                "suggested_web_search_directives": web_queries,
+                "guardrails_and_dislikes": guardrails[:5],
+                "suggested_web_search_directives": web_queries[:3],
                 "selection_rubric": [
-                    "1. Uniqueness: Avoid cliché suggestions; discover hidden masterpieces, artisanal releases, or recent acclaimed debuts.",
+                    "1. Uniqueness: Avoid cliché suggestions; discover hidden masterpieces or recent acclaimed debuts.",
                     "2. Direct Taste Tether: State explicitly which of their 10/10 anchors inspired this choice.",
-                    "3. Pre-vetting: Call 'vet_recommendation_candidate' before delivering your final pick to ensure zero library collisions.",
+                    "3. Pre-vetting: Call 'vet_recommendation_candidate' before delivering your final pick.",
                 ],
             },
         }

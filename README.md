@@ -400,12 +400,57 @@ Add the following configuration to `claude_desktop_config.json`:
       ],
       "env": {
         "FIREBASE_CREDENTIALS_PATH": "/path/to/curator_mcp/service-account.json",
-        "TMDB_API_KEY": "YOUR_TMDB_API_KEY_HERE"
+        "TMDB_API_KEY": "YOUR_TMDB_API_KEY_HERE",
+        "CURATOR_SLIM_MODE": "true"
       }
     }
   }
 }
 ```
+
+---
+
+### Option D: 🛸 Connect to Google Antigravity Agent
+
+Curator MCP integrates natively with Google Antigravity (AGY).
+
+Add `curator-mcp` to your Antigravity global MCP configuration at `~/.gemini/config/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "curator-mcp": {
+      "command": "/path/to/curator_mcp/.venv/bin/python",
+      "args": [
+        "/path/to/curator_mcp/mcp_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/path/to/curator_mcp",
+        "FIREBASE_CREDENTIALS_PATH": "/path/to/curator_mcp/service-account.json",
+        "TMDB_API_KEY": "YOUR_TMDB_API_KEY_HERE",
+        "CURATOR_SLIM_MODE": "true"
+      }
+    }
+  }
+}
+```
+
+Once saved, Antigravity automatically detects the server and exposes its tools to the agent.
+
+---
+
+### ⚡ Token Consumption Optimization Guide (Claude Desktop & Antigravity)
+
+If you are using Claude Desktop Free Tier or need strict context window limits:
+
+1. **Enable Slim Mode (`CURATOR_SLIM_MODE=true` or pass `--slim`)**:
+   - Reduces the MCP tool schema from **13,180 tokens down to ~4,500 tokens** per turn (-66%).
+   - Exposes only the 19 core, high-leverage tools (Recommendations, Vetting, Search Vault, Reading/Watch Queues, Sensory Vault, Dining, and Memory).
+2. **Unified Search (`search_vault`)**:
+   - Instead of calling separate tools for books, movies, sensory goods, and restaurants, `search_vault` searches across all domains in a single tool call.
+3. **Compact Payloads**:
+   - `get_agent_recommendation_brief` no longer injects hundreds of library titles into prompt context, saving **2,000–10,000 tokens per call**.
+   - Default search limits are reduced to 5 items with compact 120-character review snippets.
 
 ---
 

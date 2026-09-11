@@ -12,6 +12,7 @@ from collections import Counter
 
 from models import RestaurantModel
 from services.base_repository import BaseFirestoreRepository
+from services.token_utils import compact_text
 
 
 class RestaurantService(BaseFirestoreRepository):
@@ -173,10 +174,22 @@ class RestaurantService(BaseFirestoreRepository):
         status: Optional[str] = None,
         vibe: Optional[str] = None,
         min_rating: Optional[float] = None,
-        limit: int = 20,
+        limit: int = 5,
     ) -> List[Dict[str, Any]]:
         """
-        Search and filter restaurant records by city, cuisine, vibe tag, or keywords.
+        Search and filter dining records by city, cuisine, vibe tag, or keyword queries.
+
+        Args:
+            query: Keyword string matching restaurant name, dishes, neighborhood, or notes.
+            city: Optional city filter (e.g. 'Tokyo', 'London', 'Paris').
+            cuisine: Optional cuisine category (e.g. 'Japanese', 'Italian', 'French').
+            status: Optional dining status ('visited', 'wishlist').
+            vibe: Atmosphere or dining style tag (e.g. 'romantic', 'omakase', 'speakeasy').
+            min_rating: Minimum user rating threshold (1.0 to 10.0).
+            limit: Maximum number of records to return. Defaults to 5.
+
+        Returns:
+            A list of dictionary records containing venue attributes, standout dishes, and concise reviews.
         """
         q_norm = query.lower().strip()
         city_norm = city.lower().strip() if city else None
@@ -210,7 +223,18 @@ class RestaurantService(BaseFirestoreRepository):
                 if q_norm not in searchable:
                     continue
 
-            results.append(r)
+            results.append({
+                "id": r.get("id"),
+                "name": r.get("name"),
+                "city": r.get("city"),
+                "neighborhood": r.get("neighborhood"),
+                "cuisine": r.get("cuisine"),
+                "status": r.get("status"),
+                "user_rating": r.get("user_rating"),
+                "standout_dishes": r.get("standout_dishes", [])[:4],
+                "vibe_tags": r.get("vibe_tags", [])[:4],
+                "notes": compact_text(r.get("notes_and_review"), 120),
+            })
             if len(results) >= limit:
                 break
 
