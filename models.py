@@ -82,6 +82,9 @@ class MediaModel(BaseModel):
     review: str = Field(default="", description="IMDb written user review")
     user_notes: str = Field(default="", description="Personal user notes")
     date_watched: Optional[str] = Field(default=None, description="Date watched in YYYY-MM-DD format")
+    tmdb_id: Optional[int] = Field(default=None, description="The Movie Database (TMDB) ID")
+    poster_url: Optional[str] = Field(default=None, description="TMDB poster image URL")
+    overview: Optional[str] = Field(default=None, description="Plot synopsis / overview from TMDB")
     updated_at: Optional[datetime] = Field(default=None, description="Last update timestamp")
 
     @field_validator("status")

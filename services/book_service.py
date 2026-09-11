@@ -85,8 +85,63 @@ class BookService(BaseFirestoreRepository):
             for b in docs
         ]
 
+    @staticmethod
+    def _normalize_str(s: str) -> str:
+        if not s:
+            return ""
+        st = s.strip().lower()
+        st = re.sub(r"^(the|a|an)\s+", "", st)
+        return re.sub(r"[^a-z0-9]", "", st)
+
+    def find_existing(self, title: str, author: Optional[str] = None, book_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Find existing book by ID, exact title/author, or normalized title/author."""
+        if book_id:
+            doc = self.get(book_id.strip())
+            if doc:
+                return doc
+        norm_t = self._normalize_str(title)
+        raw_t = title.strip().lower()
+        norm_a = self._normalize_str(author) if author else ""
+        docs = self.stream_all()
+        for doc in docs:
+            b_title = (doc.get("title") or "").strip()
+            if not b_title:
+                continue
+            b_author = (doc.get("author") or "").strip()
+            # Match title
+            if b_title.lower() == raw_t or (norm_t and self._normalize_str(b_title) == norm_t):
+                if norm_a and b_author:
+                    doc_norm_a = self._normalize_str(b_author)
+                    if norm_a in doc_norm_a or doc_norm_a in norm_a:
+                        return doc
+                else:
+                    return doc
+        return None
+
     def add_to_reading_list(self, title: str, author: str, book_id: Optional[str] = None, notes: Optional[str] = "") -> Dict[str, Any]:
-        """Add a book recommendation directly to the 'to-read' shelf."""
+        """Add a book to 'to-read' shelf with de-duplication."""
+        existing = self.find_existing(title=title, author=author, book_id=book_id)
+        if existing:
+            doc_id = existing["id"]
+            existing_shelf = existing.get("shelf", "to-read")
+            if existing_shelf == "to-read":
+                return {
+                    "status": "already_exists",
+                    "message": f"'{existing.get('title', title)}' is already on your reading list (ID: {doc_id}). Duplicate prevented.",
+                    "book": existing
+                }
+            else:
+                existing["shelf"] = "to-read"
+                existing["updated_at"] = datetime.now(timezone.utc)
+                if notes:
+                    existing["notes_and_reviews"] = f"{existing.get('notes_and_reviews', '')} | {notes}".strip(" | ")
+                self.set(doc_id, existing)
+                return {
+                    "status": "updated",
+                    "message": f"'{existing.get('title', title)}' was marked as {existing_shelf}; updated to to-read shelf (duplicate prevented).",
+                    "book": existing
+                }
+
         doc_id = book_id.strip() if book_id else self._generate_book_id(title, author)
         book = BookModel(
             id=doc_id,
@@ -114,8 +169,7 @@ class BookService(BaseFirestoreRepository):
         private_notes: Optional[str] = "",
         date_read: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Log a finished book with Goodreads rating (0-5 stars), review, private notes, and date read."""
-        doc_id = book_id.strip() if book_id else self._generate_book_id(title, author)
+        """Log a finished book with Goodreads rating (0-5 stars) and de-duplication."""
         if not date_read:
             date_read = datetime.now().strftime("%Y-%m-%d")
 
@@ -125,6 +179,26 @@ class BookService(BaseFirestoreRepository):
         if not written_review and legacy_notes:
             written_review = legacy_notes
 
+        existing = self.find_existing(title=title, author=author, book_id=book_id)
+        if existing:
+            doc_id = existing["id"]
+            existing["shelf"] = "read"
+            existing["user_rating"] = max(0, min(5, user_rating))
+            if written_review:
+                existing["review"] = written_review
+                existing["notes_and_reviews"] = written_review
+            if priv_notes:
+                existing["private_notes"] = priv_notes
+            existing["date_read"] = date_read
+            existing["updated_at"] = datetime.now(timezone.utc)
+            self.set(doc_id, existing)
+            return {
+                "status": "success",
+                "message": f"Updated existing book '{existing.get('title', title)}' as read (duplicate prevented).",
+                "book": existing
+            }
+
+        doc_id = book_id.strip() if book_id else self._generate_book_id(title, author)
         book = BookModel(
             id=doc_id,
             title=title.strip(),

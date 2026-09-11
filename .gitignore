@@ -49,3 +49,6 @@ service-account*.json
 # Temporary files
 *.log
 scratch/
+
+# Standalone Flutter Dashboard (Client App)
+curator_flutter/
