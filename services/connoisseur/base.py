@@ -43,6 +43,28 @@ class BaseConnoisseurService(BaseFirestoreRepository):
         slug = re.sub(r"[^a-zA-Z0-9]+", "_", f"{self.category_name}_{maker}_{name}".lower()).strip("_")
         return f"sens_{slug[:28]}_{uuid.uuid4().hex[:6]}"
 
+    @staticmethod
+    def _normalize_str(s: str) -> str:
+        if not s:
+            return ""
+        st = s.strip().lower()
+        st = re.sub(r"^(the|a|an)\s+", "", st)
+        return re.sub(r"[^a-z0-9]", "", st)
+
+    def find_existing(self, name: str, maker_or_brand: str) -> Optional[Dict[str, Any]]:
+        norm_n = self._normalize_str(name)
+        norm_m = self._normalize_str(maker_or_brand)
+        raw_n = name.strip().lower()
+        raw_m = maker_or_brand.strip().lower()
+        for doc in self.stream_all():
+            if (doc.get("category") or "").lower() != self.category_name:
+                continue
+            dn = (doc.get("name") or "").strip().lower()
+            dm = (doc.get("maker_or_brand") or "").strip().lower()
+            if (dn == raw_n or self._normalize_str(dn) == norm_n) and (dm == raw_m or self._normalize_str(dm) == norm_m):
+                return doc
+        return None
+
     def log(
         self,
         name: str,
@@ -62,13 +84,37 @@ class BaseConnoisseurService(BaseFirestoreRepository):
         """
         Generic logger for items within this service's specific domain category.
         """
-        doc_id = item_id.strip() if item_id else self._generate_id(maker_or_brand, name)
-        if not date_experienced:
-            date_experienced = datetime.now().strftime("%Y-%m-%d")
-
         rating_val = None
         if user_rating is not None:
             rating_val = round(max(1.0, min(10.0, float(user_rating))), 1)
+
+        existing = self.find_existing(name, maker_or_brand)
+        if existing:
+            doc_id = existing["id"]
+            existing["status"] = status
+            if rating_val is not None:
+                existing["user_rating"] = rating_val
+            if flavor_or_scent_notes:
+                existing["flavor_or_scent_notes"] = list(set(existing.get("flavor_or_scent_notes", []) + [n.strip().lower() for n in flavor_or_scent_notes if n.strip()]))
+            if review:
+                existing["review"] = review
+            if personal_notes:
+                existing["personal_notes"] = f"{existing.get('personal_notes', '')} | {personal_notes}".strip(" | ")
+            if specs:
+                existing.setdefault("specs", {}).update(specs)
+            if date_experienced:
+                existing["date_experienced"] = date_experienced
+            existing["updated_at"] = datetime.now(timezone.utc)
+            self.set(doc_id, existing)
+            return {
+                "status": "success",
+                "message": f"Updated existing {self.category_name.capitalize()} '{existing.get('name', name)}' by {maker_or_brand} (duplicate prevented).",
+                "item": existing
+            }
+
+        doc_id = item_id.strip() if item_id else self._generate_id(maker_or_brand, name)
+        if not date_experienced:
+            date_experienced = datetime.now().strftime("%Y-%m-%d")
 
         item = SensoryItemModel(
             id=doc_id,

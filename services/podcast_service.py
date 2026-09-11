@@ -22,6 +22,26 @@ class PodcastService(BaseFirestoreRepository):
         slug = re.sub(r"[^a-zA-Z0-9]+", "_", f"{podcast_name}_{episode_title}".lower()).strip("_")
         return f"pod_{slug[:25]}_{uuid.uuid4().hex[:6]}"
 
+    @staticmethod
+    def _normalize_str(s: str) -> str:
+        if not s:
+            return ""
+        st = s.strip().lower()
+        st = re.sub(r"^(the|a|an)\s+", "", st)
+        return re.sub(r"[^a-z0-9]", "", st)
+
+    def find_existing(self, podcast_name: str, episode_title: str) -> Optional[Dict[str, Any]]:
+        norm_p = self._normalize_str(podcast_name)
+        norm_e = self._normalize_str(episode_title)
+        raw_p = podcast_name.strip().lower()
+        raw_e = episode_title.strip().lower()
+        for doc in self.stream_all():
+            dp = (doc.get("podcast_name") or "").strip().lower()
+            de = (doc.get("episode_title") or "").strip().lower()
+            if (dp == raw_p or self._normalize_str(dp) == norm_p) and (de == raw_e or self._normalize_str(de) == norm_e):
+                return doc
+        return None
+
     def add_to_queue(
         self,
         podcast_name: str,
@@ -31,7 +51,26 @@ class PodcastService(BaseFirestoreRepository):
         episode_url: Optional[str] = None,
         duration_mins: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Add an episode to the listening queue."""
+        """Add an episode to the listening queue with de-duplication."""
+        existing = self.find_existing(podcast_name, episode_title)
+        if existing:
+            doc_id = existing["id"]
+            if existing.get("status") == "queue":
+                return {
+                    "status": "already_exists",
+                    "message": f"'{episode_title}' ({podcast_name}) is already in your podcast queue (duplicate prevented).",
+                    "podcast": existing
+                }
+            else:
+                existing["status"] = "queue"
+                existing["updated_at"] = datetime.now(timezone.utc)
+                self.set(doc_id, existing)
+                return {
+                    "status": "updated",
+                    "message": f"'{episode_title}' was previously marked as {existing.get('status')}; updated to queue (duplicate prevented).",
+                    "podcast": existing
+                }
+
         doc_id = self._generate_podcast_id(podcast_name, episode_title)
         podcast = PodcastModel(
             id=doc_id,
@@ -61,11 +100,30 @@ class PodcastService(BaseFirestoreRepository):
         topics: Optional[List[str]] = None,
         date_listened: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Log a podcast as completed with ratings and takeaways."""
-        doc_id = self._generate_podcast_id(podcast_name, episode_title)
+        """Log a podcast as completed with ratings, takeaways, and de-duplication."""
         if not date_listened:
             date_listened = datetime.now().strftime("%Y-%m-%d")
 
+        existing = self.find_existing(podcast_name, episode_title)
+        if existing:
+            doc_id = existing["id"]
+            existing["status"] = "listened"
+            if user_rating is not None:
+                existing["user_rating"] = max(1, min(10, user_rating))
+            if key_takeaways:
+                existing["key_takeaways"] = key_takeaways
+            if topics:
+                existing["topics"] = list(set(existing.get("topics", []) + topics))
+            existing["date_listened"] = date_listened
+            existing["updated_at"] = datetime.now(timezone.utc)
+            self.set(doc_id, existing)
+            return {
+                "status": "success",
+                "message": f"Updated '{episode_title}' ({podcast_name}) as listened (duplicate prevented).",
+                "podcast": existing
+            }
+
+        doc_id = self._generate_podcast_id(podcast_name, episode_title)
         podcast = PodcastModel(
             id=doc_id,
             podcast_name=podcast_name.strip(),

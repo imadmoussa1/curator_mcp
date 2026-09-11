@@ -22,6 +22,26 @@ class QuoteService(BaseFirestoreRepository):
         slug = re.sub(r"[^a-zA-Z0-9]+", "_", f"{source_title}_{speaker_or_author}".lower()).strip("_")
         return f"quote_{slug[:25]}_{uuid.uuid4().hex[:6]}"
 
+    @staticmethod
+    def _normalize_text(s: str) -> str:
+        if not s:
+            return ""
+        return re.sub(r"[^a-z0-9]", "", s.strip().lower())
+
+    def find_existing(self, quote_text: str, source_title: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        norm_q = self._normalize_text(quote_text)
+        norm_s = self._normalize_text(source_title) if source_title else ""
+        for doc in self.stream_all():
+            dq = self._normalize_text(doc.get("quote_text") or "")
+            if dq == norm_q or (len(norm_q) > 20 and norm_q in dq) or (len(dq) > 20 and dq in norm_q):
+                if norm_s:
+                    ds = self._normalize_text(doc.get("source_title") or "")
+                    if ds == norm_s or norm_s in ds or ds in norm_s:
+                        return doc
+                else:
+                    return doc
+        return None
+
     def add(
         self,
         quote_text: str,
@@ -33,6 +53,23 @@ class QuoteService(BaseFirestoreRepository):
         favorite: bool = False
     ) -> Dict[str, Any]:
         """Save a memorable quote with metadata."""
+        existing = self.find_existing(quote_text, source_title)
+        if existing:
+            doc_id = existing["id"]
+            if theme_tags:
+                existing["theme_tags"] = list(set(existing.get("theme_tags", []) + theme_tags))
+            if favorite:
+                existing["favorite"] = True
+            if notes:
+                existing["notes"] = f"{existing.get('notes', '')} | {notes}".strip(" | ")
+            existing["updated_at"] = datetime.now(timezone.utc)
+            self.set(doc_id, existing)
+            return {
+                "status": "already_exists",
+                "message": f"Quote from '{source_title}' already exists; updated tags/notes (duplicate prevented).",
+                "quote": existing
+            }
+
         quote_id = self._generate_quote_id(source_title, speaker_or_author or "")
         quote = QuoteModel(
             id=quote_id,

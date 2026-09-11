@@ -26,6 +26,26 @@ class RestaurantService(BaseFirestoreRepository):
         slug = re.sub(r"[^a-zA-Z0-9]+", "_", f"{city}_{name}".lower()).strip("_")
         return f"rest_{slug[:28]}_{uuid.uuid4().hex[:6]}"
 
+    @staticmethod
+    def _normalize_str(s: str) -> str:
+        if not s:
+            return ""
+        st = s.strip().lower()
+        st = re.sub(r"^(the|a|an)\s+", "", st)
+        return re.sub(r"[^a-z0-9]", "", st)
+
+    def find_existing(self, name: str, city: str) -> Optional[Dict[str, Any]]:
+        norm_n = self._normalize_str(name)
+        norm_c = self._normalize_str(city)
+        raw_n = name.strip().lower()
+        raw_c = city.strip().lower()
+        for doc in self.stream_all():
+            dn = (doc.get("name") or "").strip().lower()
+            dc = (doc.get("city") or "").strip().lower()
+            if (dn == raw_n or self._normalize_str(dn) == norm_n) and (dc == raw_c or self._normalize_str(dc) == norm_c):
+                return doc
+        return None
+
     def log_restaurant(
         self,
         name: str,
@@ -46,13 +66,37 @@ class RestaurantService(BaseFirestoreRepository):
         """
         Log a restaurant visit or add a restaurant to the dining wishlist.
         """
-        doc_id = restaurant_id.strip() if restaurant_id else self._generate_restaurant_id(city, name)
-        if not date_visited and status == "visited":
-            date_visited = datetime.now().strftime("%Y-%m-%d")
-
         rating_val = None
         if user_rating is not None:
             rating_val = round(max(1.0, min(10.0, float(user_rating))), 1)
+
+        existing = self.find_existing(name, city)
+        if existing:
+            doc_id = existing["id"]
+            existing["status"] = status
+            if rating_val is not None:
+                existing["user_rating"] = rating_val
+            if michelin_status:
+                existing["michelin_status"] = michelin_status
+            if standout_dishes:
+                existing["standout_dishes"] = list(set(existing.get("standout_dishes", []) + [d.strip() for d in standout_dishes if d.strip()]))
+            if notes_and_review:
+                existing["notes_and_review"] = f"{existing.get('notes_and_review', '')} | {notes_and_review}".strip(" | ")
+            if vibe_tags:
+                existing["vibe_tags"] = list(set(existing.get("vibe_tags", []) + [v.strip().lower() for v in vibe_tags if v.strip()]))
+            if date_visited:
+                existing["date_visited"] = date_visited
+            existing["updated_at"] = datetime.now(timezone.utc)
+            self.set(doc_id, existing)
+            return {
+                "status": "success",
+                "message": f"Updated existing restaurant '{existing.get('name', name)}' in {city} (duplicate prevented).",
+                "restaurant": existing
+            }
+
+        doc_id = restaurant_id.strip() if restaurant_id else self._generate_restaurant_id(city, name)
+        if not date_visited and status == "visited":
+            date_visited = datetime.now().strftime("%Y-%m-%d")
 
         rest = RestaurantModel(
             id=doc_id,
